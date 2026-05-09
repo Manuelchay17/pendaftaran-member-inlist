@@ -5,11 +5,13 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
-    const { type, email, fullname, ticketNumber } = await req.json();
+    const body = await req.json();
+    const { type, email, fullname } = body;
+    const ticketNumber = body.ticketNumber || body.ticketNo || body.ticket_no;
 
     // Basic validation
     if (!email || !fullname || !ticketNumber) {
-      return NextResponse.json({ error: 'Missing required fields: email, fullname, or ticketNumber' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing required fields: email, fullname, or a ticket number field' }, { status: 400 });
     }
 
     let subject = '';

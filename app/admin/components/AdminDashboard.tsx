@@ -9,6 +9,7 @@ type RegistrationStatus = 'Menunggu' | 'Disetujui' | 'Ditolak'
 type Registration = {
   id: number
   ticketNo: string
+  ticket_no?: string
   fullname: string
   identityNo: string
   noHp: string
@@ -94,6 +95,7 @@ export default function AdminDashboard() {
       const mapped = (data || []).map((r: any) => ({
         id: r.id,
         ticketNo: r.ticket_no,
+        ticket_no: r.ticket_no,
         fullname: r.fullname,
         identityNo: r.identity_no || '-',
         noHp: r.no_hp || '-',
@@ -195,7 +197,6 @@ export default function AdminDashboard() {
     setShowModal(false)
 
     // Send approval email (non-blocking)
-    // Send approval email (non-blocking)
     fetch('/api/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -203,7 +204,7 @@ export default function AdminDashboard() {
         type: 'STATUS_APPROVED',
         email: reg.email,
         fullname: reg.fullname,
-        ticketNumber: (reg as any).ticket_no // GANTI DARI ticketNo KE ticket_no
+        ticketNumber: (reg as any).ticket_no
       })
     }).catch(err => console.error('Email approval error:', err))
 
