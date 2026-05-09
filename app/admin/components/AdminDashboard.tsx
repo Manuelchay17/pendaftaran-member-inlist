@@ -195,6 +195,7 @@ export default function AdminDashboard() {
     setShowModal(false)
 
     // Send approval email (non-blocking)
+    // Send approval email (non-blocking)
     fetch('/api/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -202,7 +203,7 @@ export default function AdminDashboard() {
         type: 'STATUS_APPROVED',
         email: reg.email,
         fullname: reg.fullname,
-        ticketNumber: reg.ticketNo
+        ticketNumber: reg.ticket_no // GANTI DARI ticketNo KE ticket_no
       })
     }).catch(err => console.error('Email approval error:', err))
 
@@ -522,6 +523,7 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
                     onClick={() => setShowRejectForm(true)}
                     className="flex-1 py-3 bg-white border border-red-600 text-red-600 font-bold rounded-xl hover:bg-red-50 transition-colors"
                   >
+                    
                     ✗ TOLAK PENDAFTARAN
                   </button>
                   <button 
