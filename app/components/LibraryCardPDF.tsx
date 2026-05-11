@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
 interface LibraryCardPDFProps {
   registration: {
     fullname: string;
-    ticketNo: string;
+    ticketNumber: string;
   };
   qrCodeUrl: string;
   pasFotoPublicUrl: string;
@@ -169,7 +169,7 @@ export const LibraryCardPDF = ({ registration, qrCodeUrl, pasFotoPublicUrl }: Li
                 </View>
                 <View>
                   <Text style={styles.label}>Nomor Anggota / Tiket</Text>
-                  <Text style={styles.ticketNo}>{registration.ticketNo}</Text>
+                  <Text style={styles.ticketNo}>{registration.ticketNumber}</Text>
                 </View>
               </View>
             </View>

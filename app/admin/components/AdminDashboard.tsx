@@ -1,15 +1,23 @@
     'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PDFDownloadLink } from '@react-pdf/renderer'
 import { LibraryCardPDF } from '@/app/components/LibraryCardPDF'
 import QRCode from 'qrcode'
 
+const ADMIN_CONFIG = {
+  USERNAME: 'admin.perpus',
+  PASSWORD: 'Dispuspa@2026',
+  DB_TABLE: 'registrations',
+  STORAGE_BUCKET: 'dokumen-anggota',
+  CITY_DEFAULT: 'Batang',
+  PROVINCE_DEFAULT: 'Jawa Tengah'
+}
+
 type RegistrationStatus = 'Menunggu' | 'Disetujui' | 'Ditolak'
 type Registration = {
   id: number
-  ticketNo: string
-  ticket_no?: string
+  ticketNumber: string
   fullname: string
   identityNo: string
   noHp: string
@@ -26,8 +34,8 @@ type Registration = {
   sexId: number
   agamaId: number
   maritalStatusId: string
-  pas_foto_url?: string
-  foto_ktp_url?: string
+  pasFotoUrl?: string
+  fotoKtpUrl?: string
   motherMaidenName: string
   identityTypeId: number
   educationLevelId: number
@@ -62,21 +70,19 @@ export default function AdminDashboard() {
 
 
 
-  const fetchRegistrations = async () => {
+  const fetchRegistrations = useCallback(async () => {
     setIsLoadingData(true)
     try {
       const { data, error } = await supabase
-        .from('registrations')
+        .from(ADMIN_CONFIG.DB_TABLE)
         .select('*')
         .order('created_at', { ascending: false })
 
       if (error) throw error
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mapped = (data || []).map((r: any) => ({
         id: r.id,
-        ticketNo: r.ticket_no,
-        ticket_no: r.ticket_no,
+        ticketNumber: r.ticket_no,
         fullname: r.fullname,
         identityNo: r.identity_no || '-',
         noHp: r.no_hp || '-',
@@ -88,8 +94,8 @@ export default function AdminDashboard() {
         kelurahan: r.kelurahan || '-',
         rt: r.rt || '-',
         rw: r.rw || '-',
-        city: r.city || 'Batang',
-        province: r.province || 'Jawa Tengah',
+        city: r.city || ADMIN_CONFIG.CITY_DEFAULT,
+        province: r.province || ADMIN_CONFIG.PROVINCE_DEFAULT,
         sexId: r.sex_id || 0,
         agamaId: r.agama_id || 0,
         maritalStatusId: r.marital_status_id || '-',
@@ -101,8 +107,8 @@ export default function AdminDashboard() {
         namaDarurat: r.nama_darurat || '-',
         telpDarurat: r.telp_darurat || '-',
         statusHubunganDarurat: r.status_hubungan_darurat || '-',
-        pas_foto_url: r.pas_foto_url || '',
-        foto_ktp_url: r.foto_ktp_url || '',
+        pasFotoUrl: r.pas_foto_url || '',
+        fotoKtpUrl: r.foto_ktp_url || '',
         registerDate: r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : '-',
         status: (r.status as RegistrationStatus) || 'Menunggu',
         rejectReason: r.reject_reason || '',
@@ -115,7 +121,7 @@ export default function AdminDashboard() {
     } finally {
       setIsLoadingData(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -125,19 +131,18 @@ export default function AdminDashboard() {
   }, [isLoggedIn])
 
   useEffect(() => {
-  if (selectedReg && selectedReg.status === 'Disetujui') {
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-    
-    const verifyUrl = `${baseUrl}/cek-status?tiket=${selectedReg.ticketNo}`;
-    
-    QRCode.toDataURL(verifyUrl, { width: 300, margin: 2 })
-      .then(url => setQrCodeData(url))
-      .catch(err => console.error("QR Error:", err));
-  }
-}, [selectedReg]);
+    if (selectedReg && selectedReg.status === 'Disetujui') {
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      const verifyUrl = `${baseUrl}/cek-status?tiket=${selectedReg.ticketNumber}`;
+      
+      QRCode.toDataURL(verifyUrl, { width: 300, margin: 2 })
+        .then(url => setQrCodeData(url))
+        .catch(err => console.error("QR Error:", err));
+    }
+  }, [selectedReg]);
 
   const handleLogin = () => {
-    if (loginUser === 'admin.perpus' && loginPass === 'Dispuspa@2026') {
+    if (loginUser === ADMIN_CONFIG.USERNAME && loginPass === ADMIN_CONFIG.PASSWORD) {
       setIsLoggedIn(true)
       setLoginError('')
     } else {
@@ -145,153 +150,129 @@ export default function AdminDashboard() {
     }
   }
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToast(msg)
-    setTimeout(() => setToast(''), 3000)
-  }
+    const timer = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(timer)
+  }, [])
 
-  const handleApprove = async (id: number) => {
-    const reg = registrations.find(r => r.id === id)
-    if (!reg) return
-
-    // Safety Check Email
-    if (reg.email === '-' || !reg.email.includes('@')) {
-      showToast('❌ Email pendaftar tidak valid, tidak bisa mengirim notifikasi.')
-      return
-    }
-
-    const { error } = await supabase
-      .from('registrations')
-      .update({
-        status: 'Disetujui',
-        approved_at: new Date().toISOString(),
-        approved_by: 'admin.perpus'
-      })
-      .eq('id', id)
-
-    if (error) {
-      showToast('❌ Gagal mengupdate status. Coba lagi.')
-      return
-    }
-
-    setRegistrations(prev => prev.map(r =>
-      r.id === id ? { ...r, status: 'Disetujui' } : r
-    ))
-    setShowModal(false)
-
-    // Notify API
-    const payload = {
-      type: 'STATUS_APPROVED',
-      email: reg.email,
-      fullname: reg.fullname,
-      ticketNumber: (reg as any).ticket_no || (reg as any).ticketNo
-    }
-    
-    console.log('Sending payload:', payload)
-
+  const sendNotification = async (payload: any) => {
     try {
       const response = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-      
       if (!response.ok) {
-        throw new Error(`Notification failed with status: ${response.status}`)
+        const result = await response.json()
+        throw new Error(result.error || `Error ${response.status}`)
       }
-    } catch (err) {
-      console.error('Email approval error:', err)
+      return true
+    } catch (err: any) {
+      console.error('Notification error:', err)
+      showToast(`❌ Gagal mengirim email: ${err.message}`)
+      return false
+    }
+  }
+
+  const handleApprove = async (id: number) => {
+    const reg = registrations.find(r => r.id === id)
+    if (!reg) return
+
+    if (reg.email === '-' || !reg.email.includes('@')) {
+      showToast('❌ Email pendaftar tidak valid.')
+      return
     }
 
-    showToast('✅ Pendaftaran disetujui! Email notifikasi dikirim ke anggota.')
+    const { error } = await supabase
+      .from(ADMIN_CONFIG.DB_TABLE)
+      .update({
+        status: 'Disetujui',
+        approved_at: new Date().toISOString(),
+        approved_by: ADMIN_CONFIG.USERNAME
+      })
+      .eq('id', id)
+
+    if (error) {
+      showToast('❌ Gagal update database.')
+      return
+    }
+
+    setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Disetujui' } : r))
+    setShowModal(false)
+
+    const success = await sendNotification({
+      type: 'STATUS_APPROVED',
+      email: reg.email,
+      fullname: reg.fullname,
+      ticketNumber: reg.ticketNumber
+    })
+
+    if (success) {
+      showToast('✅ Pendaftaran disetujui & Email dikirim.')
+    }
   }
 
   const handleReject = async (id: number) => {
-  console.log("Memulai proses penolakan untuk ID:", id); // LOG 1
-  
-  if (!rejectReason.trim()) {
-    alert("Alasan tidak boleh kosong!");
-    return;
-  }
-
-  const reg = registrations.find(r => r.id === id);
-  if (!reg) {
-    console.error("Data pendaftar tidak ditemukan di state!"); // LOG 2
-    return;
-  }
-
-  const tNumber = (reg as any).ticket_no || (reg as any).ticketNo;
-  const currentReason = rejectReason;
-
-  // Update Database
-  const { error } = await supabase
-    .from('registrations')
-    .update({ status: 'Ditolak', reject_reason: currentReason })
-    .eq('id', id);
-
-  if (error) {
-    console.error("Gagal update Supabase:", error);
-    showToast('❌ Gagal update database');
-    return;
-  }
-
-  // Safety Check Email
-  if (reg.email === '-' || !reg.email.includes('@')) {
-    showToast('❌ Email pendaftar tidak valid, tidak bisa mengirim notifikasi.');
-    // Walaupun email gagal, kita tetap update UI agar sinkron dengan DB
-    setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Ditolak', rejectReason: currentReason } : r));
-    setShowModal(false);
-    setShowRejectForm(false);
-    setRejectReason('');
-    return;
-  }
-
-  // JIKA DATABASE BERHASIL, PAKSA KIRIM EMAIL
-  console.log("Database OK, mengirim email ke:", reg.email); // LOG 3
-
-  try {
-    const response = await fetch('/api/notify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'STATUS_REJECTED',
-        email: reg.email,
-        fullname: reg.fullname,
-        ticketNumber: tNumber,
-        rejectReason: currentReason
-      })
-    });
-
-    const result = await response.json();
-    console.log("Respon API Notify:", result); // LOG 4
-
-    if (response.ok) {
-      setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Ditolak', rejectReason: currentReason } : r));
-      setShowModal(false);
-      setShowRejectForm(false);
-      setRejectReason('');
-      showToast('✅ Berhasil ditolak & Email dikirim.');
-    } else {
-      alert("API Error: " + (result.error?.message || result.error));
+    if (!rejectReason.trim()) {
+      showToast("⚠️ Alasan tidak boleh kosong!")
+      return
     }
-  } catch (err) {
-    console.error("Fatal Fetch Error:", err);
-    alert("Koneksi ke API terputus!");
+
+    const reg = registrations.find(r => r.id === id)
+    if (!reg) return
+
+    const currentReason = rejectReason
+
+    const { error } = await supabase
+      .from(ADMIN_CONFIG.DB_TABLE)
+      .update({ status: 'Ditolak', reject_reason: currentReason })
+      .eq('id', id)
+
+    if (error) {
+      showToast('❌ Gagal update database.')
+      return
+    }
+
+    if (reg.email === '-' || !reg.email.includes('@')) {
+      showToast('⚠️ Email tidak valid, status tetap diupdate.')
+      setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Ditolak', rejectReason: currentReason } : r))
+      setShowModal(false)
+      setShowRejectForm(false)
+      setRejectReason('')
+      return
+    }
+
+    const success = await sendNotification({
+      type: 'STATUS_REJECTED',
+      email: reg.email,
+      fullname: reg.fullname,
+      ticketNumber: reg.ticketNumber,
+      rejectReason: currentReason
+    })
+
+    if (success) {
+      setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Ditolak', rejectReason: currentReason } : r))
+      setShowModal(false)
+      setShowRejectForm(false)
+      setRejectReason('')
+      showToast('✅ Berhasil ditolak & Email dikirim.')
+    }
   }
-};
 
-  const filtered = registrations.filter(r => {
+  const filtered = useMemo(() => registrations.filter(r => {
+    const query = searchQuery.toLowerCase()
     const matchFilter = activeFilter === 'Semua' || r.status === activeFilter
-    const matchSearch = r.fullname.toLowerCase().includes(searchQuery.toLowerCase()) || r.ticketNo.includes(searchQuery)
+    const matchSearch = r.fullname.toLowerCase().includes(query) || r.ticketNumber.toLowerCase().includes(query)
     return matchFilter && matchSearch
-  })
+  }), [registrations, activeFilter, searchQuery])
 
-  const counts = { 
+  const counts = useMemo(() => ({ 
     total: registrations.length, 
     menunggu: registrations.filter(r=>r.status==='Menunggu').length, 
     disetujui: registrations.filter(r=>r.status==='Disetujui').length, 
     ditolak: registrations.filter(r=>r.status==='Ditolak').length 
-  }
+  }), [registrations])
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
@@ -302,7 +283,7 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
   
   const finalPath = cleanPath.includes('/') ? cleanPath : `${folder}/${cleanPath}`;
 
-  return `${supabaseUrl}/storage/v1/object/public/dokumen-anggota/${finalPath}`;
+  return `${supabaseUrl}/storage/v1/object/public/${ADMIN_CONFIG.STORAGE_BUCKET}/${finalPath}`;
 };
 
   if (!isLoggedIn) return (
@@ -432,7 +413,7 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
               {filtered.map((reg, idx) => (
                 <tr key={reg.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 text-gray-400 font-mono">{idx + 1}</td>
-                  <td className="px-6 py-4 font-bold text-blue-900">{reg.ticketNo}</td>
+                  <td className="px-6 py-4 font-bold text-blue-900">{reg.ticketNumber}</td>
                   <td className="px-6 py-4 font-medium">{reg.fullname}</td>
                   <td className="px-6 py-4 text-gray-600 font-mono text-xs">{reg.identityNo}</td>
                   <td className="px-6 py-4 text-gray-500">{reg.registerDate}</td>
@@ -473,7 +454,7 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
             <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
               <div>
                 <h2 className="text-xl font-bold text-blue-900">Detail Pendaftaran Anggota</h2>
-                <p className="text-sm font-mono text-gray-500">{selectedReg.ticketNo}</p>
+                <p className="text-sm font-mono text-gray-500">{selectedReg.ticketNumber}</p>
               </div>
               <button onClick={() => setShowModal(false)} className="text-2xl hover:rotate-90 transition-transform">✕</button>
             </div>
@@ -516,9 +497,9 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <p className="text-[10px] font-bold text-gray-500 uppercase">Pas Foto</p>
-                      {selectedReg.pas_foto_url ? (
+                      {selectedReg.pasFotoUrl ? (
                         <img
-                          src={getImageUrl(selectedReg.pas_foto_url, 'pas-foto') || ''}
+                          src={getImageUrl(selectedReg.pasFotoUrl || '', 'pas-foto') || ''}
                           alt="Pas Foto Anggota"
                           className="w-full rounded-lg border border-gray-200 object-cover aspect-[3/4]"
                           onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
@@ -531,9 +512,9 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
                     </div>
                     <div className="space-y-2">
                       <p className="text-[10px] font-bold text-gray-500 uppercase">Foto KTP</p>
-                      {selectedReg.foto_ktp_url ? (
+                      {selectedReg.fotoKtpUrl ? (
                         <img
-                          src={getImageUrl(selectedReg.foto_ktp_url, 'foto-ktp') || ''}
+                          src={getImageUrl(selectedReg.fotoKtpUrl || '', 'foto-ktp') || ''}
                           alt="Foto KTP Anggota"
                           className="w-full rounded-lg border border-gray-200 object-cover aspect-[3/4]"
                           onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
@@ -605,9 +586,12 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
                     <PDFDownloadLink
                       document={
                         <LibraryCardPDF 
-                          registration={selectedReg}
+                          registration={{
+                            fullname: selectedReg.fullname,
+                            ticketNumber: selectedReg.ticketNumber
+                          }}
                           qrCodeUrl={qrCodeData}
-                          pasFotoPublicUrl={getImageUrl(selectedReg.pas_foto_url || '', 'pas-foto') || ''}
+                          pasFotoPublicUrl={getImageUrl(selectedReg.pasFotoUrl || '', 'pas-foto') || ''}
                         />
                       }
                       fileName={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}

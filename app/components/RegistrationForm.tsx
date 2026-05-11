@@ -2,6 +2,13 @@
 import { supabase } from '@/lib/supabase'
 import React, { useState, ChangeEvent, FormEvent } from "react";
 
+const FORM_CONFIG = {
+  TICKET_PREFIX: 'REG-2026-',
+  STORAGE_BUCKET: 'dokumen-anggota',
+  CITY_DEFAULT: 'Batang',
+  PROVINCE_DEFAULT: 'Jawa Tengah'
+}
+
 interface FormData {
   fullname: string;
   placeOfBirth: string;
@@ -50,8 +57,8 @@ export default function RegistrationForm() {
     kelurahan: "",
     rt: "",
     rw: "",
-    city: "Batang",
-    province: "Jawa Tengah",
+    city: FORM_CONFIG.CITY_DEFAULT,
+    province: FORM_CONFIG.PROVINCE_DEFAULT,
     noHp: "",
     phone: "",
     email: "",
@@ -199,7 +206,7 @@ export default function RegistrationForm() {
     setIsLoading(true)
 
     try {
-      const ticketNo = `REG-2026-${Math.floor(10000 + Math.random() * 90000)}`
+      const ticketNo = `${FORM_CONFIG.TICKET_PREFIX}${Math.floor(10000 + Math.random() * 90000)}`
 
       // Upload pas foto
       let pasFotoUrl = ''
@@ -207,7 +214,7 @@ export default function RegistrationForm() {
         const ext = pasFoto.name.split('.').pop()
         const path = `pas-foto/${ticketNo}.${ext}`
         const { error: uploadError } = await supabase.storage
-          .from('dokumen-anggota')
+          .from(FORM_CONFIG.STORAGE_BUCKET)
           .upload(path, pasFoto)
         if (!uploadError) pasFotoUrl = path
       }
@@ -218,7 +225,7 @@ export default function RegistrationForm() {
         const ext = fotoKtp.name.split('.').pop()
         const path = `foto-ktp/${ticketNo}.${ext}`
         const { error: uploadError } = await supabase.storage
-          .from('dokumen-anggota')
+          .from(FORM_CONFIG.STORAGE_BUCKET)
           .upload(path, fotoKtp)
         if (!uploadError) fotoKtpUrl = path
       }

@@ -8,16 +8,21 @@ import { PDFDownloadLink } from '@react-pdf/renderer'
 import { LibraryCardPDF } from '@/app/components/LibraryCardPDF'
 import QRCode from 'qrcode'
 
+const STATUS_CONFIG = {
+  STORAGE_BUCKET: 'dokumen-anggota',
+  SITE_URL_FALLBACK: 'https://pendaftaran-perpus-batang.vercel.app'
+}
+
 type RegistrationStatus = 'Menunggu' | 'Disetujui' | 'Ditolak'
 
 interface SearchResult {
-  ticket_no: string
+  ticketNumber: string
   fullname: string
   status: RegistrationStatus
-  created_at: string
-  approved_at: string | null
-  reject_reason: string | null
-  pas_foto_url: string | null
+  createdAt: string
+  approvedAt: string | null
+  rejectReason: string | null
+  pasFotoUrl: string | null
 }
 
 type SearchState = 'idle' | 'loading' | 'not_found' | 'found'
@@ -45,17 +50,26 @@ function CekStatusInner() {
     if (error || !data) {
       setSearchState('not_found')
     } else {
-      setResult(data as SearchResult)
+      const r = data as any
+      setResult({
+        ticketNumber: r.ticket_no,
+        fullname: r.fullname,
+        status: r.status as RegistrationStatus,
+        createdAt: r.created_at,
+        approvedAt: r.approved_at,
+        rejectReason: r.reject_reason,
+        pasFotoUrl: r.pas_foto_url
+      })
       setSearchState('found')
     }
   }, [ticketInput])
 
 
 
-  const generateQRCode = useCallback(async (ticketNo: string) => {
+  const generateQRCode = useCallback(async (ticketNumber: string) => {
     try {
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pendaftaran-perpus-batang.vercel.app'
-      const url = `${baseUrl}/cek-status?tiket=${ticketNo}`
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || STATUS_CONFIG.SITE_URL_FALLBACK)
+      const url = `${baseUrl}/cek-status?tiket=${ticketNumber}`
       const qrData = await QRCode.toDataURL(url, {
         margin: 1,
         width: 150,
@@ -83,7 +97,7 @@ function CekStatusInner() {
   useEffect(() => {
     if (result && result.status === 'Disetujui') {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      generateQRCode(result.ticket_no)
+      generateQRCode(result.ticketNumber)
     }
   }, [result, generateQRCode])
 
@@ -93,7 +107,7 @@ function CekStatusInner() {
     if (!path) return null;
     const cleanPath = path.trim();
     const finalPath = cleanPath.includes('/') ? cleanPath : `${folder}/${cleanPath}`;
-    return `${supabaseUrl}/storage/v1/object/public/dokumen-anggota/${finalPath}`;
+    return `${supabaseUrl}/storage/v1/object/public/${STATUS_CONFIG.STORAGE_BUCKET}/${finalPath}`;
   };
 
   const formatDate = (iso: string | null) => {
@@ -196,9 +210,9 @@ function CekStatusInner() {
                     <span className="text-gray-500">Nama Lengkap</span>
                     <span className="font-semibold text-gray-900">{result.fullname}</span>
                     <span className="text-gray-500">Nomor Tiket</span>
-                    <span className="font-mono font-bold" style={{ color: '#1e3a5f' }}>{result.ticket_no}</span>
+                    <span className="font-mono font-bold" style={{ color: '#1e3a5f' }}>{result.ticketNumber}</span>
                     <span className="text-gray-500">Tanggal Daftar</span>
-                    <span>{formatDate(result.created_at)}</span>
+                    <span>{formatDate(result.createdAt)}</span>
                   </div>
                   <div className="bg-yellow-100 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
                     Pendaftaran Anda sedang dalam proses verifikasi oleh petugas. Estimasi{' '}
@@ -227,11 +241,11 @@ function CekStatusInner() {
                     <span className="text-gray-500">Nama Lengkap</span>
                     <span className="font-semibold text-gray-900">{result.fullname}</span>
                     <span className="text-gray-500">Nomor Tiket</span>
-                    <span className="font-mono font-bold" style={{ color: '#1e3a5f' }}>{result.ticket_no}</span>
+                    <span className="font-mono font-bold" style={{ color: '#1e3a5f' }}>{result.ticketNumber}</span>
                     <span className="text-gray-500">Tanggal Daftar</span>
-                    <span>{formatDate(result.created_at)}</span>
+                    <span>{formatDate(result.createdAt)}</span>
                     <span className="text-gray-500">Tanggal Disetujui</span>
-                    <span className="text-green-700 font-medium">{formatDate(result.approved_at)}</span>
+                    <span className="text-green-700 font-medium">{formatDate(result.approvedAt)}</span>
                   </div>
                   <div className="bg-green-100 border border-green-200 rounded-xl p-4 text-sm text-green-800">
                     🎉 <strong>Selamat!</strong> Pendaftaran Anda telah disetujui. Kartu anggota
@@ -253,10 +267,10 @@ function CekStatusInner() {
                           <LibraryCardPDF 
                             registration={{
                               fullname: result.fullname,
-                              ticketNo: result.ticket_no
+                              ticketNumber: result.ticketNumber
                             }}
                             qrCodeUrl={qrCodeData}
-                            pasFotoPublicUrl={getImageUrl(result.pas_foto_url || '', 'pas-foto') || ''}
+                            pasFotoPublicUrl={getImageUrl(result.pasFotoUrl || '', 'pas-foto') || ''}
                           />
                         }
                         fileName={`KARTU-PERPUS-${result.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
@@ -311,14 +325,14 @@ function CekStatusInner() {
                     <span className="text-gray-500">Nama Lengkap</span>
                     <span className="font-semibold text-gray-900">{result.fullname}</span>
                     <span className="text-gray-500">Nomor Tiket</span>
-                    <span className="font-mono font-bold" style={{ color: '#1e3a5f' }}>{result.ticket_no}</span>
+                    <span className="font-mono font-bold" style={{ color: '#1e3a5f' }}>{result.ticketNumber}</span>
                     <span className="text-gray-500">Tanggal Daftar</span>
-                    <span>{formatDate(result.created_at)}</span>
+                    <span>{formatDate(result.createdAt)}</span>
                   </div>
-                  {result.reject_reason && (
+                  {result.rejectReason && (
                     <div className="bg-red-100 border border-red-200 rounded-xl p-4 text-sm text-red-800">
                       <p className="font-bold mb-1">Alasan Penolakan:</p>
-                      <p className="italic">{result.reject_reason}</p>
+                      <p className="italic">{result.rejectReason}</p>
                     </div>
                   )}
                   <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 text-xs text-orange-700">
