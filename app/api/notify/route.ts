@@ -5,13 +5,11 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { type, email, fullname } = body;
-    const ticketNumber = body.ticketNumber || body.ticketNo || body.ticket_no;
+    const { type, email, fullname, ticketNumber, rejectReason: bodyReason } = await req.json();
 
     // Basic validation
     if (!email || !fullname || !ticketNumber) {
-      return NextResponse.json({ error: 'Missing required fields: email, fullname, or a ticket number field' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing required fields: email, fullname, or ticketNumber' }, { status: 400 });
     }
 
     let subject = '';
@@ -77,6 +75,42 @@ export async function POST(req: Request) {
 
             <div style="border-top: 1px solid #eee; padding-top: 20px; color: #666; font-size: 14px;">
               <p><strong>Catatan:</strong> Anda juga bisa mendapatkan kartu fisik dengan menunjukkan nomor tiket <strong>${ticketNumber}</strong> di meja layanan Perpustakaan Daerah Batang.</p>
+            </div>
+          </div>
+          <div style="background-color: #f4f4f4; padding: 25px; text-align: center; color: #777; font-size: 12px; border-top: 1px solid #eeeeee;">
+            <p style="margin: 0;">&copy; 2026 Dinas Perpustakaan dan Kearsipan Kabupaten Batang</p>
+            <p style="margin: 5px 0 0;">Jl. Alun-alun Batang No. 1, Batang, Jawa Tengah</p>
+          </div>
+        </div>
+      `;
+    } else if (type === 'STATUS_REJECTED') {
+      subject = 'Pendaftaran Belum Dapat Disetujui - Dispuspa Batang';
+      html = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
+          <div style="background-color: #b91c1c; padding: 40px 20px; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 28px; letter-spacing: 1px;">DISPUSPA BATANG</h1>
+            <p style="color: #fecaca; margin: 10px 0 0; font-weight: bold; text-transform: uppercase;">Informasi Status Pendaftaran</p>
+          </div>
+          <div style="padding: 40px 30px;">
+            <h2 style="color: #b91c1c; margin-top: 0; font-size: 22px;">Halo, ${fullname}</h2>
+            <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px;">Terima kasih atas minat Anda untuk menjadi anggota Perpustakaan Daerah Kabupaten Batang. Namun, dengan menyesal kami informasikan bahwa saat ini pendaftaran Anda <strong>belum dapat disetujui</strong>.</p>
+            
+            <div style="background-color: #fef2f2; border-left: 4px solid #b91c1c; padding: 20px; margin: 30px 0;">
+              <p style="color: #991b1b; font-weight: bold; margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase;">Alasan Penolakan:</p>
+              <p style="color: #4a4a4a; margin: 0; font-style: italic; font-size: 15px;">"${bodyReason || 'Data tidak sesuai atau berkas kurang lengkap.'}"</p>
+            </div>
+
+            <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px; margin-bottom: 30px;">Silakan melakukan pendaftaran ulang dengan memperbaiki data atau berkas sesuai alasan di atas melalui website kami.</p>
+            
+            <div style="text-align: center; margin-bottom: 40px;">
+              <a href="${siteUrl}" 
+                 style="background-color: #b91c1c; color: #ffffff; padding: 18px 36px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block; font-size: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                Daftar Ulang Sekarang
+              </a>
+            </div>
+
+            <div style="border-top: 1px solid #eee; padding-top: 20px; color: #666; font-size: 14px; text-align: center;">
+              <p>Nomor Tiket Referensi: <strong>${ticketNumber}</strong></p>
             </div>
           </div>
           <div style="background-color: #f4f4f4; padding: 25px; text-align: center; color: #777; font-size: 12px; border-top: 1px solid #eeeeee;">

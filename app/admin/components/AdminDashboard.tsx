@@ -213,6 +213,9 @@ export default function AdminDashboard() {
 
   const handleReject = async (id: number) => {
     if (!rejectReason.trim()) return
+    const reg = registrations.find(r => r.id === id)
+    if (!reg) return
+
     const { error } = await supabase
       .from('registrations')
       .update({ status: 'Ditolak', reject_reason: rejectReason })
@@ -222,8 +225,23 @@ export default function AdminDashboard() {
       setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Ditolak', rejectReason } : r))
       setShowModal(false)
       setShowRejectForm(false)
+      
+      const currentReason = rejectReason
       setRejectReason('')
       showToast('❌ Pendaftaran telah ditolak.')
+
+      // Send rejection email (non-blocking)
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'STATUS_REJECTED',
+          email: reg.email,
+          fullname: reg.fullname,
+          ticketNumber: (reg as any).ticket_no,
+          rejectReason: currentReason
+        })
+      }).catch(err => console.error('Email rejection error:', err))
     } else {
       showToast('❌ Gagal mengupdate status. Coba lagi.')
     }
