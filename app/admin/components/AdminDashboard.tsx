@@ -180,7 +180,7 @@ export default function AdminDashboard() {
         type: 'STATUS_APPROVED',
         email: reg.email,
         fullname: reg.fullname,
-        ticketNumber: (reg as unknown as { ticket_no: string }).ticket_no
+        ticketNumber: (reg as any).ticket_no
       })
     }).catch(err => console.error('Email approval error:', err))
 
@@ -213,7 +213,7 @@ export default function AdminDashboard() {
           type: 'STATUS_REJECTED',
           email: reg.email,
           fullname: reg.fullname,
-          ticketNumber: (reg as unknown as { ticket_no: string }).ticket_no,
+          ticketNumber: (reg as any).ticket_no,
           rejectReason: currentReason
         })
       }).catch(err => console.error('Email rejection error:', err))

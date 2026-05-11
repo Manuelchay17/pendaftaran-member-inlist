@@ -192,7 +192,6 @@ export default function RegistrationForm() {
   };
 
   const handleSubmit = async (e?: FormEvent) => {
-    console.log('handleSubmit called', formData)
     e?.preventDefault()
 
     if (!validate()) return

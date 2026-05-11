@@ -97,7 +97,7 @@ export async function POST(req: Request) {
             
             <div style="background-color: #fef2f2; border-left: 4px solid #b91c1c; padding: 20px; margin: 30px 0;">
               <p style="color: #991b1b; font-weight: bold; margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase;">Alasan Penolakan:</p>
-              <p style="color: #4a4a4a; margin: 0; font-style: italic; font-size: 15px;">"${rejectReason || 'Data tidak sesuai atau berkas kurang lengkap.'}"</p>
+              <p style="color: #4a4a4a; margin: 0; font-style: italic; font-size: 15px;">"${rejectReason}"</p>
             </div>
 
             <p style="color: #4a4a4a; line-height: 1.6; font-size: 16px; margin-bottom: 30px;">Silakan melakukan pendaftaran ulang dengan memperbaiki data atau berkas sesuai alasan di atas melalui website kami.</p>
