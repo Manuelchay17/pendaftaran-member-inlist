@@ -173,16 +173,29 @@ export default function AdminDashboard() {
     ))
     setShowModal(false)
 
-    fetch('/api/notify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'STATUS_APPROVED',
-        email: reg.email,
-        fullname: reg.fullname,
-        ticketNumber: (reg as any).ticket_no
+    // Notify API
+    const payload = {
+      type: 'STATUS_APPROVED',
+      email: reg.email,
+      fullname: reg.fullname,
+      ticketNumber: (reg as any).ticket_no || (reg as any).ticketNo
+    }
+    
+    console.log('Sending payload:', payload)
+
+    try {
+      const response = await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       })
-    }).catch(err => console.error('Email approval error:', err))
+      
+      if (!response.ok) {
+        throw new Error(`Notification failed with status: ${response.status}`)
+      }
+    } catch (err) {
+      console.error('Email approval error:', err)
+    }
 
     showToast('✅ Pendaftaran disetujui! Email notifikasi dikirim ke anggota.')
   }
@@ -197,28 +210,45 @@ export default function AdminDashboard() {
       .update({ status: 'Ditolak', reject_reason: rejectReason })
       .eq('id', id)
 
-    if (!error) {
-      setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Ditolak', rejectReason } : r))
-      setShowModal(false)
-      setShowRejectForm(false)
-      
-      const currentReason = rejectReason
-      setRejectReason('')
-      showToast('❌ Pendaftaran telah ditolak.')
+    if (error) {
+      showToast('❌ Gagal mengupdate status. Coba lagi.')
+      return
+    }
 
-      fetch('/api/notify', {
+    const currentReason = rejectReason
+    
+    setRegistrations(prev => prev.map(r => 
+      r.id === id ? { ...r, status: 'Ditolak', rejectReason: currentReason, reject_reason: currentReason } : r
+    ))
+    
+    setShowModal(false)
+    setShowRejectForm(false)
+    setRejectReason('')
+    showToast('❌ Pendaftaran telah ditolak.')
+
+    // Notify API
+    const payload = {
+      type: 'STATUS_REJECTED',
+      email: reg.email,
+      fullname: reg.fullname,
+      ticketNumber: (reg as any).ticket_no || (reg as any).ticketNo,
+      rejectReason: currentReason
+    }
+
+    console.log('Sending payload:', payload)
+
+    try {
+      const response = await fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'STATUS_REJECTED',
-          email: reg.email,
-          fullname: reg.fullname,
-          ticketNumber: (reg as any).ticket_no,
-          rejectReason: currentReason
-        })
-      }).catch(err => console.error('Email rejection error:', err))
-    } else {
-      showToast('❌ Gagal mengupdate status. Coba lagi.')
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        throw new Error(`Notification failed with status: ${response.status}`)
+      }
+    } catch (err) {
+      console.error('Email rejection error:', err)
     }
   }
 
