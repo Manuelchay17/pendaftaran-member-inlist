@@ -1,102 +1,34 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { PDFDownloadLink } from '@react-pdf/renderer'
-import { LibraryCardPDF } from '@/app/components/LibraryCardPDF'
-import QRCode from 'qrcode'
-
-const STATUS_CONFIG = {
-  STORAGE_BUCKET: 'dokumen-anggota',
-  SITE_URL_FALLBACK: 'https://pendaftaran-perpus-batang.vercel.app'
-}
-
-type RegistrationStatus = 'Menunggu' | 'Disetujui' | 'Ditolak'
-
-interface SearchResult {
-  ticketNumber: string
-  fullname: string
-  status: RegistrationStatus
-  createdAt: string
-  approvedAt: string | null
-  rejectReason: string | null
-  pasFotoUrl: string | null
-}
-
-type SearchState = 'idle' | 'loading' | 'not_found' | 'found'
+import { useStatusSearch } from '@/hooks/useStatusSearch'
+import { STATUS_CONFIG } from '@/lib/constants'
+import { StatusCard } from '@/app/components/status/StatusCard'
 
 function CekStatusInner() {
   const searchParams = useSearchParams()
-  const [ticketInput, setTicketInput] = useState(() => searchParams.get('tiket')?.toUpperCase() || '')
-  const [searchState, setSearchState] = useState<SearchState>('idle')
-  const [result, setResult] = useState<SearchResult | null>(null)
-  const [qrCodeData, setQrCodeData] = useState<string>('')
-
-  const handleSearch = useCallback(async (overrideTicket?: string) => {
-    const ticket = (overrideTicket || ticketInput).toUpperCase().trim()
-    if (!ticket) return
-
-    setSearchState('loading')
-    setResult(null)
-
-    const { data, error } = await supabase
-      .from('registrations')
-      .select('ticket_no, fullname, status, created_at, approved_at, reject_reason, pas_foto_url')
-      .eq('ticket_no', ticket)
-      .single()
-
-    if (error || !data) {
-      setSearchState('not_found')
-    } else {
-      const r = data as any
-      setResult({
-        ticketNumber: r.ticket_no,
-        fullname: r.fullname,
-        status: r.status as RegistrationStatus,
-        createdAt: r.created_at,
-        approvedAt: r.approved_at,
-        rejectReason: r.reject_reason,
-        pasFotoUrl: r.pas_foto_url
-      })
-      setSearchState('found')
-    }
-  }, [ticketInput])
-
-
-
-  const generateQRCode = useCallback(async (ticketNumber: string) => {
-    try {
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL || STATUS_CONFIG.SITE_URL_FALLBACK)
-      const url = `${baseUrl}/cek-status?tiket=${ticketNumber}`
-      const qrData = await QRCode.toDataURL(url, {
-        margin: 1,
-        width: 150,
-        errorCorrectionLevel: 'H',
-        color: {
-          dark: '#1e3a5f',
-          light: '#ffffff'
-        }
-      })
-      setQrCodeData(qrData)
-    } catch (err) {
-      console.error('Error generating QR code:', err)
-    }
-  }, [])
+  const {
+    ticketInput,
+    setTicketInput,
+    searchState,
+    result,
+    qrCodeData,
+    handleSearch,
+    generateQRCode
+  } = useStatusSearch(searchParams.get('tiket')?.toUpperCase() || '')
 
   // Auto-search jika ada ?tiket= di URL
   useEffect(() => {
     const tiketFromUrl = searchParams.get('tiket')
     if (tiketFromUrl) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       handleSearch(tiketFromUrl)
     }
   }, [searchParams, handleSearch])
 
   useEffect(() => {
-    if (result && result.status === 'Disetujui') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (result && result.status === 'Disetujui' && result.ticketNumber) {
       generateQRCode(result.ticketNumber)
     }
   }, [result, generateQRCode])
@@ -110,7 +42,7 @@ function CekStatusInner() {
     return `${supabaseUrl}/storage/v1/object/public/${STATUS_CONFIG.STORAGE_BUCKET}/${finalPath}`;
   };
 
-  const formatDate = (iso: string | null) => {
+  const formatDate = (iso: string | null | undefined) => {
     if (!iso) return '-'
     return new Date(iso).toLocaleDateString('id-ID', {
       day: 'numeric',
@@ -123,21 +55,18 @@ function CekStatusInner() {
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* HEADER */}
       <header style={{ backgroundColor: '#1e3a5f' }} className="py-6 md:py-10 px-4 shadow-lg">
-  <div className="max-w-3xl mx-auto text-center">
-    {/* Menggunakan flex-col di mobile agar ikon di atas teks, lalu flex-row di desktop */}
-    <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 mb-3">
-      <span className="text-3xl md:text-4xl">🔍</span>
-      <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-[0.15em] md:tracking-[0.25em] text-white uppercase leading-tight">
-        Cek Status Pendaftaran
-      </h1>
-    </div>
-    
-    {/* Ukuran teks instansi dibuat lebih kecil dan rapat di mobile */}
-    <p className="text-[10px] sm:text-xs md:text-sm font-medium uppercase tracking-wider opacity-90 px-2" style={{ color: '#c8a84b' }}>
-      Dinas Perpustakaan dan Kearsipan Kabupaten Batang
-    </p>
-  </div>
-</header>
+        <div className="max-w-3xl mx-auto text-center">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-4 mb-3">
+            <span className="text-3xl md:text-4xl">🔍</span>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-[0.15em] md:tracking-[0.25em] text-white uppercase leading-tight">
+              Cek Status Pendaftaran
+            </h1>
+          </div>
+          <p className="text-[10px] sm:text-xs md:text-sm font-medium uppercase tracking-wider opacity-90 px-2" style={{ color: '#c8a84b' }}>
+            Dinas Perpustakaan dan Kearsipan Kabupaten Batang
+          </p>
+        </div>
+      </header>
 
       <main className="max-w-3xl mx-auto px-4 py-10 space-y-6">
         {/* SEARCH CARD */}
@@ -195,165 +124,12 @@ function CekStatusInner() {
 
         {/* Found */}
         {searchState === 'found' && result && (
-          <>
-            {/* MENUNGGU */}
-            {result.status === 'Menunggu' && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-2xl overflow-hidden shadow-md">
-                <div className="bg-yellow-400 px-6 py-4 flex items-center gap-3">
-                  <span className="text-2xl">⏳</span>
-                  <span className="text-xs font-bold uppercase tracking-widest text-yellow-900 bg-yellow-200 px-2 py-0.5 rounded-full">
-                    Menunggu Verifikasi
-                  </span>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-y-3 text-sm">
-                    <span className="text-gray-500">Nama Lengkap</span>
-                    <span className="font-semibold text-gray-900">{result.fullname}</span>
-                    <span className="text-gray-500">Nomor Tiket</span>
-                    <span className="font-mono font-bold" style={{ color: '#1e3a5f' }}>{result.ticketNumber}</span>
-                    <span className="text-gray-500">Tanggal Daftar</span>
-                    <span>{formatDate(result.createdAt)}</span>
-                  </div>
-                  <div className="bg-yellow-100 border border-yellow-200 rounded-xl p-4 text-sm text-yellow-800">
-                    Pendaftaran Anda sedang dalam proses verifikasi oleh petugas. Estimasi{' '}
-                    <strong>1–3 hari kerja</strong>.
-                  </div>
-                  <ProgressSteps steps={[
-                    { label: 'Formulir Diterima', state: 'done' },
-                    { label: 'Sedang Diverifikasi', state: 'active' },
-                    { label: 'Selesai', state: 'pending' },
-                  ]} />
-                </div>
-              </div>
-            )}
-
-            {/* DISETUJUI */}
-            {result.status === 'Disetujui' && (
-              <div className="bg-green-50 border border-green-200 rounded-2xl overflow-hidden shadow-md">
-                <div className="bg-green-500 px-6 py-4 flex items-center gap-3">
-                  <span className="text-2xl">✅</span>
-                  <span className="text-xs font-bold uppercase tracking-widest text-white bg-green-700 px-2 py-0.5 rounded-full">
-                    Pendaftaran Disetujui
-                  </span>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-y-3 text-sm">
-                    <span className="text-gray-500">Nama Lengkap</span>
-                    <span className="font-semibold text-gray-900">{result.fullname}</span>
-                    <span className="text-gray-500">Nomor Tiket</span>
-                    <span className="font-mono font-bold" style={{ color: '#1e3a5f' }}>{result.ticketNumber}</span>
-                    <span className="text-gray-500">Tanggal Daftar</span>
-                    <span>{formatDate(result.createdAt)}</span>
-                    <span className="text-gray-500">Tanggal Disetujui</span>
-                    <span className="text-green-700 font-medium">{formatDate(result.approvedAt)}</span>
-                  </div>
-                  <div className="bg-green-100 border border-green-200 rounded-xl p-4 text-sm text-green-800">
-                    🎉 <strong>Selamat!</strong> Pendaftaran Anda telah disetujui. Kartu anggota
-                    perpustakaan Anda sedang disiapkan.
-                  </div>
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-700 flex gap-2">
-                    <span className="text-base">📬</span>
-                    <span>
-                      Kartu anggota akan dikirimkan ke email Anda atau dapat diambil langsung di{' '}
-                      <strong>Perpustakaan Daerah Kabupaten Batang</strong>.
-                    </span>
-                  </div>
-
-                  {/* DOWNLOAD BUTTON */}
-                  <div className="pt-2">
-                    {qrCodeData ? (
-                      <PDFDownloadLink
-                        document={
-                          <LibraryCardPDF 
-                            registration={{
-                              fullname: result.fullname,
-                              ticketNumber: result.ticketNumber
-                            }}
-                            qrCodeUrl={qrCodeData}
-                            pasFotoPublicUrl={getImageUrl(result.pasFotoUrl || '', 'pas-foto') || ''}
-                          />
-                        }
-                        fileName={`KARTU-PERPUS-${result.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
-                      >
-                        {({ loading }) => (
-                          <button 
-                            disabled={loading}
-                            className="w-full py-4 bg-blue-900 text-white font-bold rounded-2xl flex items-center justify-center gap-3 hover:bg-blue-800 transition-all shadow-lg active:scale-[0.98]"
-                            style={{ backgroundColor: '#1e3a5f' }}
-                          >
-                            {loading ? (
-                              <>
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                MENYIAPKAN KARTU...
-                              </>
-                            ) : (
-                              <>
-                                <span className="text-xl">📥</span>
-                                DOWNLOAD KARTU DIGITAL
-                              </>
-                            )}
-                          </button>
-                        )}
-                      </PDFDownloadLink>
-                    ) : (
-                      <div className="w-full py-4 bg-gray-100 text-gray-400 font-bold rounded-2xl flex items-center justify-center gap-3">
-                        <div className="w-5 h-5 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
-                        MENYIAPKAN DATA...
-                      </div>
-                    )}
-                  </div>
-                  <ProgressSteps steps={[
-                    { label: 'Formulir Diterima', state: 'done' },
-                    { label: 'Terverifikasi', state: 'done' },
-                    { label: 'Selesai', state: 'done' },
-                  ]} />
-                </div>
-              </div>
-            )}
-
-            {/* DITOLAK */}
-            {result.status === 'Ditolak' && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl overflow-hidden shadow-md">
-                <div className="bg-red-500 px-6 py-4 flex items-center gap-3">
-                  <span className="text-2xl">❌</span>
-                  <span className="text-xs font-bold uppercase tracking-widest text-white bg-red-700 px-2 py-0.5 rounded-full">
-                    Pendaftaran Ditolak
-                  </span>
-                </div>
-                <div className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-y-3 text-sm">
-                    <span className="text-gray-500">Nama Lengkap</span>
-                    <span className="font-semibold text-gray-900">{result.fullname}</span>
-                    <span className="text-gray-500">Nomor Tiket</span>
-                    <span className="font-mono font-bold" style={{ color: '#1e3a5f' }}>{result.ticketNumber}</span>
-                    <span className="text-gray-500">Tanggal Daftar</span>
-                    <span>{formatDate(result.createdAt)}</span>
-                  </div>
-                  {result.rejectReason && (
-                    <div className="bg-red-100 border border-red-200 rounded-xl p-4 text-sm text-red-800">
-                      <p className="font-bold mb-1">Alasan Penolakan:</p>
-                      <p className="italic">{result.rejectReason}</p>
-                    </div>
-                  )}
-                  <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 text-xs text-orange-700">
-                    ℹ️ Anda dapat mendaftar ulang dengan memperbaiki kekurangan di atas.
-                  </div>
-                  <ProgressSteps steps={[
-                    { label: 'Formulir Diterima', state: 'done' },
-                    { label: 'Ditolak', state: 'rejected' },
-                    { label: 'Selesai', state: 'pending' },
-                  ]} />
-                  <Link
-                    href="/"
-                    className="block w-full text-center py-3 rounded-xl text-white font-bold text-sm transition-opacity hover:opacity-90 mt-2"
-                    style={{ backgroundColor: '#1e3a5f' }}
-                  >
-                    DAFTAR ULANG
-                  </Link>
-                </div>
-              </div>
-            )}
-          </>
+          <StatusCard 
+            result={result} 
+            qrCodeData={qrCodeData} 
+            getImageUrl={getImageUrl} 
+            formatDate={formatDate} 
+          />
         )}
 
         {/* BACK LINK */}
@@ -380,42 +156,5 @@ export default function CekStatus() {
     }>
       <CekStatusInner />
     </Suspense>
-  )
-}
-
-/* ─── Progress Steps Component ─── */
-type StepState = 'done' | 'active' | 'pending' | 'rejected'
-
-function ProgressSteps({ steps }: { steps: { label: string; state: StepState }[] }) {
-  const icon = (s: StepState) => {
-    if (s === 'done') return '✅'
-    if (s === 'active') return '⏳'
-    if (s === 'rejected') return '❌'
-    return '⬜'
-  }
-
-  const labelColor = (s: StepState) => {
-    if (s === 'done') return 'text-green-700'
-    if (s === 'active') return 'text-yellow-700 font-bold'
-    if (s === 'rejected') return 'text-red-700 font-bold'
-    return 'text-gray-400'
-  }
-
-  return (
-    <div className="flex items-center gap-1 pt-2">
-      {steps.map((step, i) => (
-        <div key={i} className="flex items-center flex-1">
-          <div className="flex flex-col items-center flex-1">
-            <span className="text-lg">{icon(step.state)}</span>
-            <span className={`text-[10px] text-center mt-1 leading-tight ${labelColor(step.state)}`}>
-              {step.label}
-            </span>
-          </div>
-          {i < steps.length - 1 && (
-            <div className="h-px flex-1 bg-gray-200 mb-4 mx-1" />
-          )}
-        </div>
-      ))}
-    </div>
   )
 }

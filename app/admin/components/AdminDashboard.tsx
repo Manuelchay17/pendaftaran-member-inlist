@@ -1,64 +1,30 @@
-    'use client'
+'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
-import { PDFDownloadLink } from '@react-pdf/renderer'
-import { LibraryCardPDF } from '@/app/components/LibraryCardPDF'
 import QRCode from 'qrcode'
 
-const ADMIN_CONFIG = {
-  USERNAME: 'admin.perpus',
-  PASSWORD: 'Dispuspa@2026',
-  DB_TABLE: 'registrations',
-  STORAGE_BUCKET: 'dokumen-anggota',
-  CITY_DEFAULT: 'Batang',
-  PROVINCE_DEFAULT: 'Jawa Tengah'
-}
-
-type RegistrationStatus = 'Menunggu' | 'Disetujui' | 'Ditolak'
-type Registration = {
-  id: number
-  ticketNumber: string
-  fullname: string
-  identityNo: string
-  noHp: string
-  email: string
-  placeOfBirth: string
-  dateOfBirth: string
-  address: string
-  kecamatan: string
-  kelurahan: string
-  rt: string
-  rw: string
-  city: string
-  province: string
-  sexId: number
-  agamaId: number
-  maritalStatusId: string
-  pasFotoUrl?: string
-  fotoKtpUrl?: string
-  motherMaidenName: string
-  identityTypeId: number
-  educationLevelId: number
-  jobId: number
-  institutionName: string
-  namaDarurat: string
-  telpDarurat: string
-  statusHubunganDarurat: string
-  registerDate: string
-  status: RegistrationStatus
-  rejectReason?: string
-}
-
-
+import { Registration, RegistrationStatus } from '@/types'
+import { ADMIN_CONFIG } from '@/lib/constants'
+import { Toast } from '@/app/components/ui/Toast'
+import { useRegistrations } from '@/hooks/useRegistrations'
+import { StatsOverview } from '@/app/components/admin/StatsOverview'
+import { RegistrationTable } from '@/app/components/admin/RegistrationTable'
+import { ActionModals } from '@/app/components/admin/ActionModals'
 
 export default function AdminDashboard() {
+  const { 
+    registrations, 
+    isLoadingData, 
+    fetchError, 
+    fetchRegistrations, 
+    handleApprove, 
+    handleReject 
+  } = useRegistrations()
+
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [loginUser, setLoginUser] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
-  const [registrations, setRegistrations] = useState<Registration[]>([])
-  const [isLoadingData, setIsLoadingData] = useState(true)
-  const [fetchError, setFetchError] = useState('')
+  
   const [activeFilter, setActiveFilter] = useState<'Semua'|RegistrationStatus>('Semua')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedReg, setSelectedReg] = useState<Registration|null>(null)
@@ -68,67 +34,11 @@ export default function AdminDashboard() {
   const [toast, setToast] = useState('')
   const [qrCodeData, setQrCodeData] = useState<string>('')
 
-
-
-  const fetchRegistrations = useCallback(async () => {
-    setIsLoadingData(true)
-    try {
-      const { data, error } = await supabase
-        .from(ADMIN_CONFIG.DB_TABLE)
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      const mapped = (data || []).map((r: any) => ({
-        id: r.id,
-        ticketNumber: r.ticket_no,
-        fullname: r.fullname,
-        identityNo: r.identity_no || '-',
-        noHp: r.no_hp || '-',
-        email: r.email || '-',
-        placeOfBirth: r.place_of_birth || '-',
-        dateOfBirth: r.date_of_birth || '-',
-        address: r.address || '-',
-        kecamatan: r.kecamatan || '-',
-        kelurahan: r.kelurahan || '-',
-        rt: r.rt || '-',
-        rw: r.rw || '-',
-        city: r.city || ADMIN_CONFIG.CITY_DEFAULT,
-        province: r.province || ADMIN_CONFIG.PROVINCE_DEFAULT,
-        sexId: r.sex_id || 0,
-        agamaId: r.agama_id || 0,
-        maritalStatusId: r.marital_status_id || '-',
-        motherMaidenName: r.mother_maiden_name || '-',
-        identityTypeId: r.identity_type_id || 0,
-        educationLevelId: r.education_level_id || 0,
-        jobId: r.job_id || 0,
-        institutionName: r.institution_name || '',
-        namaDarurat: r.nama_darurat || '-',
-        telpDarurat: r.telp_darurat || '-',
-        statusHubunganDarurat: r.status_hubungan_darurat || '-',
-        pasFotoUrl: r.pas_foto_url || '',
-        fotoKtpUrl: r.foto_ktp_url || '',
-        registerDate: r.created_at ? new Date(r.created_at).toLocaleDateString('id-ID') : '-',
-        status: (r.status as RegistrationStatus) || 'Menunggu',
-        rejectReason: r.reject_reason || '',
-      }))
-
-      setRegistrations(mapped)
-    } catch (err) {
-      console.error('Fetch error:', err)
-      setFetchError('Gagal memuat data. Silakan refresh halaman.')
-    } finally {
-      setIsLoadingData(false)
-    }
-  }, [])
-
   useEffect(() => {
     if (isLoggedIn) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchRegistrations()
     }
-  }, [isLoggedIn])
+  }, [isLoggedIn, fetchRegistrations])
 
   useEffect(() => {
     if (selectedReg && selectedReg.status === 'Disetujui') {
@@ -156,107 +66,26 @@ export default function AdminDashboard() {
     return () => clearTimeout(timer)
   }, [])
 
-  const sendNotification = async (payload: any) => {
+  const onApprove = async (reg: Registration) => {
     try {
-      const response = await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      if (!response.ok) {
-        const result = await response.json()
-        throw new Error(result.error || `Error ${response.status}`)
-      }
-      return true
+      await handleApprove(reg)
+      showToast('✅ Pendaftaran berhasil disetujui!')
+      setShowModal(false)
     } catch (err: any) {
-      console.error('Notification error:', err)
-      showToast(`❌ Gagal mengirim email: ${err.message}`)
-      return false
+      showToast('❌ ' + err.message)
     }
   }
 
-  const handleApprove = async (id: number) => {
-    const reg = registrations.find(r => r.id === id)
-    if (!reg) return
-
-    if (reg.email === '-' || !reg.email.includes('@')) {
-      showToast('❌ Email pendaftar tidak valid.')
-      return
-    }
-
-    const { error } = await supabase
-      .from(ADMIN_CONFIG.DB_TABLE)
-      .update({
-        status: 'Disetujui',
-        approved_at: new Date().toISOString(),
-        approved_by: ADMIN_CONFIG.USERNAME
-      })
-      .eq('id', id)
-
-    if (error) {
-      showToast('❌ Gagal update database.')
-      return
-    }
-
-    setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Disetujui' } : r))
-    setShowModal(false)
-
-    const success = await sendNotification({
-      type: 'STATUS_APPROVED',
-      email: reg.email,
-      fullname: reg.fullname,
-      ticketNumber: reg.ticketNumber
-    })
-
-    if (success) {
-      showToast('✅ Pendaftaran disetujui & Email dikirim.')
-    }
-  }
-
-  const handleReject = async (id: number) => {
-    if (!rejectReason.trim()) {
-      showToast("⚠️ Alasan tidak boleh kosong!")
-      return
-    }
-
-    const reg = registrations.find(r => r.id === id)
-    if (!reg) return
-
-    const currentReason = rejectReason
-
-    const { error } = await supabase
-      .from(ADMIN_CONFIG.DB_TABLE)
-      .update({ status: 'Ditolak', reject_reason: currentReason })
-      .eq('id', id)
-
-    if (error) {
-      showToast('❌ Gagal update database.')
-      return
-    }
-
-    if (reg.email === '-' || !reg.email.includes('@')) {
-      showToast('⚠️ Email tidak valid, status tetap diupdate.')
-      setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Ditolak', rejectReason: currentReason } : r))
-      setShowModal(false)
+  const onReject = async () => {
+    if (!selectedReg || !rejectReason.trim()) return
+    try {
+      await handleReject(selectedReg, rejectReason)
+      showToast('✅ Pendaftaran telah ditolak.')
       setShowRejectForm(false)
-      setRejectReason('')
-      return
-    }
-
-    const success = await sendNotification({
-      type: 'STATUS_REJECTED',
-      email: reg.email,
-      fullname: reg.fullname,
-      ticketNumber: reg.ticketNumber,
-      rejectReason: currentReason
-    })
-
-    if (success) {
-      setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Ditolak', rejectReason: currentReason } : r))
       setShowModal(false)
-      setShowRejectForm(false)
       setRejectReason('')
-      showToast('✅ Berhasil ditolak & Email dikirim.')
+    } catch (err: any) {
+      showToast('❌ ' + err.message)
     }
   }
 
@@ -274,17 +103,14 @@ export default function AdminDashboard() {
     ditolak: registrations.filter(r=>r.status==='Ditolak').length 
   }), [registrations])
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
-  if (!path) return null;
-  
-  const cleanPath = path.trim();
-  
-  const finalPath = cleanPath.includes('/') ? cleanPath : `${folder}/${cleanPath}`;
-
-  return `${supabaseUrl}/storage/v1/object/public/${ADMIN_CONFIG.STORAGE_BUCKET}/${finalPath}`;
-};
+  const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
+    if (!path) return null;
+    const cleanPath = path.trim();
+    const finalPath = cleanPath.includes('/') ? cleanPath : `${folder}/${cleanPath}`;
+    return `${supabaseUrl}/storage/v1/object/public/${ADMIN_CONFIG.STORAGE_BUCKET}/${finalPath}`;
+  };
 
   if (!isLoggedIn) return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -336,304 +162,48 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
             </div>
           </div>
         )}
+        
         {fetchError && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-red-600 text-sm flex items-center gap-2">
             ⚠️ {fetchError}
             <button onClick={fetchRegistrations} className="ml-auto text-xs underline">Coba lagi</button>
           </div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-yellow-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 font-medium">Menunggu Review</p>
-                <h3 className="text-3xl font-bold">{counts.menunggu}</h3>
-              </div>
-              <span className="text-3xl">⏳</span>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 font-medium">Total Disetujui</p>
-                <h3 className="text-3xl font-bold">{counts.disetujui}</h3>
-              </div>
-              <span className="text-3xl">✅</span>
-            </div>
-          </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 font-medium">Total Ditolak</p>
-                <h3 className="text-3xl font-bold">{counts.ditolak}</h3>
-              </div>
-              <span className="text-3xl">❌</span>
-            </div>
-          </div>
-        </div>
 
-        <div className="bg-white p-4 rounded-t-xl shadow-sm border-b flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex bg-gray-100 p-1 rounded-lg w-full md:w-auto">
-            {['Semua', 'Menunggu', 'Disetujui', 'Ditolak'].map((f) => (
-              <button
-                key={f}
-                onClick={() => setActiveFilter(f as 'Semua' | RegistrationStatus)}
-                className={`px-4 py-2 text-xs font-bold rounded-md transition-all ${activeFilter === f ? 'bg-white shadow-sm text-blue-900' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-          <div className="relative w-full md:w-80">
-            <input
-              type="text"
-              placeholder="Cari nama atau nomor tiket..."
-              className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-blue-900"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <span className="absolute left-3 top-2.5 opacity-30">🔍</span>
-          </div>
-        </div>
+        <StatsOverview counts={counts} />
 
-        <div className="bg-white rounded-b-xl shadow-sm overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 text-gray-600 uppercase text-[10px] font-bold tracking-wider">
-                <th className="px-6 py-4">No</th>
-                <th className="px-6 py-4">Nomor Tiket</th>
-                <th className="px-6 py-4">Nama Lengkap</th>
-                <th className="px-6 py-4">NIK</th>
-                <th className="px-6 py-4">Tanggal Daftar</th>
-                <th className="px-6 py-4 text-center">Status</th>
-                <th className="px-6 py-4 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y text-sm">
-              {filtered.map((reg, idx) => (
-                <tr key={reg.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 text-gray-400 font-mono">{idx + 1}</td>
-                  <td className="px-6 py-4 font-bold text-blue-900">{reg.ticketNumber}</td>
-                  <td className="px-6 py-4 font-medium">{reg.fullname}</td>
-                  <td className="px-6 py-4 text-gray-600 font-mono text-xs">{reg.identityNo}</td>
-                  <td className="px-6 py-4 text-gray-500">{reg.registerDate}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex justify-center">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-tighter ${
-                        reg.status === 'Menunggu' ? 'bg-yellow-100 text-yellow-700' :
-                        reg.status === 'Disetujui' ? 'bg-green-100 text-green-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {reg.status}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => { setSelectedReg(reg); setShowModal(true); setShowRejectForm(false); }}
-                      className="text-xs font-bold px-4 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-900 hover:text-white transition-all"
-                    >
-                      LIHAT DETAIL
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-400">Data pendaftaran tidak ditemukan.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <RegistrationTable 
+          registrations={filtered}
+          activeFilter={activeFilter}
+          setActiveFilter={setActiveFilter}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onSelect={(reg) => {
+            setSelectedReg(reg)
+            setShowModal(true)
+            setShowRejectForm(false)
+          }}
+        />
+
+        <ActionModals 
+          selectedReg={selectedReg}
+          onClose={() => {
+            setShowModal(false)
+            setShowRejectForm(false)
+          }}
+          onApprove={onApprove}
+          onReject={onReject}
+          qrCodeData={qrCodeData}
+          getImageUrl={getImageUrl}
+          showRejectForm={showRejectForm}
+          setShowRejectForm={setShowRejectForm}
+          rejectReason={rejectReason}
+          setRejectReason={setRejectReason}
+        />
       </main>
 
-      {showModal && selectedReg && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl flex flex-col">
-            <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
-              <div>
-                <h2 className="text-xl font-bold text-blue-900">Detail Pendaftaran Anggota</h2>
-                <p className="text-sm font-mono text-gray-500">{selectedReg.ticketNumber}</p>
-              </div>
-              <button onClick={() => setShowModal(false)} className="text-2xl hover:rotate-90 transition-transform">✕</button>
-            </div>
-
-            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-xs font-bold text-blue-900 uppercase tracking-widest mb-3 border-b pb-1">Data Pribadi</h3>
-                  <div className="grid grid-cols-2 gap-y-3 text-sm">
-                    <span className="text-gray-500">Nama Lengkap</span> <span className="font-medium">{selectedReg.fullname}</span>
-                    <span className="text-gray-500">NIK</span> <span className="font-mono">{selectedReg.identityNo}</span>
-                    <span className="text-gray-500">Tempat, Tgl Lahir</span> <span>{selectedReg.placeOfBirth}, {selectedReg.dateOfBirth}</span>
-                    <span className="text-gray-500">Jenis Kelamin</span> <span>{selectedReg.sexId === 1 ? 'Laki-laki' : 'Perempuan'}</span>
-                    <span className="text-gray-500">Alamat</span> <span className="leading-tight">{selectedReg.address}, RT{selectedReg.rt}/RW{selectedReg.rw}, {selectedReg.kelurahan}, {selectedReg.kecamatan}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-xs font-bold text-blue-900 uppercase tracking-widest mb-3 border-b pb-1">Kontak & Pendidikan</h3>
-                  <div className="grid grid-cols-2 gap-y-3 text-sm">
-                    <span className="text-gray-500">No. HP</span> <span className="font-medium text-green-700">{selectedReg.noHp}</span>
-                    <span className="text-gray-500">Email</span> <span>{selectedReg.email}</span>
-                    <span className="text-gray-500">Instansi</span> <span>{selectedReg.institutionName || '-'}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-xs font-bold text-blue-900 uppercase tracking-widest mb-3 border-b pb-1">Kontak Darurat</h3>
-                  <div className="grid grid-cols-2 gap-y-3 text-sm">
-                    <span className="text-gray-500">Nama</span> <span>{selectedReg.namaDarurat}</span>
-                    <span className="text-gray-500">No. Telp</span> <span>{selectedReg.telpDarurat}</span>
-                    <span className="text-gray-500">Hubungan</span> <span>{selectedReg.statusHubunganDarurat}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-xs font-bold text-blue-900 uppercase tracking-widest mb-3 border-b pb-1">Berkas Lampiran</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">Pas Foto</p>
-                      {selectedReg.pasFotoUrl ? (
-                        <img
-                          src={getImageUrl(selectedReg.pasFotoUrl || '', 'pas-foto') || ''}
-                          alt="Pas Foto Anggota"
-                          className="w-full rounded-lg border border-gray-200 object-cover aspect-[3/4]"
-                          onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
-                        />
-                      ) : (
-                        <div className="aspect-[3/4] bg-gray-100 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 text-xs text-center p-4">
-                          Foto tidak tersedia
-                        </div>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-[10px] font-bold text-gray-500 uppercase">Foto KTP</p>
-                      {selectedReg.fotoKtpUrl ? (
-                        <img
-                          src={getImageUrl(selectedReg.fotoKtpUrl || '', 'foto-ktp') || ''}
-                          alt="Foto KTP Anggota"
-                          className="w-full rounded-lg border border-gray-200 object-cover aspect-[3/4]"
-                          onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
-                        />
-                      ) : (
-                        <div className="aspect-[3/4] bg-gray-100 rounded-lg border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 text-xs text-center p-4">
-                          Foto tidak tersedia
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {selectedReg.status === 'Ditolak' && (
-                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                    <p className="text-xs font-bold text-red-700 uppercase mb-1">Alasan Penolakan:</p>
-                    <p className="text-sm italic">{selectedReg.rejectReason}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="p-6 border-t bg-gray-50 rounded-b-2xl">
-              {selectedReg.status === 'Menunggu' && !showRejectForm && (
-                <div className="flex gap-4">
-                  <button 
-                    onClick={() => setShowRejectForm(true)}
-                    className="flex-1 py-3 bg-white border border-red-600 text-red-600 font-bold rounded-xl hover:bg-red-50 transition-colors"
-                  >
-                    
-                    ✗ TOLAK PENDAFTARAN
-                  </button>
-                  <button 
-                    onClick={() => handleApprove(selectedReg.id)}
-                    className="flex-2 py-3 bg-green-700 text-white font-bold rounded-xl hover:bg-green-800 shadow-lg shadow-green-200 transition-colors flex-[2]"
-                  >
-                    ✓ SETUJUI & KIRIM KE INLISLITE
-                  </button>
-                </div>
-              )}
-
-              {showRejectForm && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-                  <label htmlFor="reject-textarea" className="block text-sm font-bold mb-2">Alasan Penolakan (Wajib diisi):</label>
-                  <textarea 
-                    id="reject-textarea"
-                    className="w-full border-2 border-red-100 rounded-xl p-4 text-sm focus:border-red-400 outline-none mb-4"
-                    rows={3}
-                    placeholder="Contoh: Foto KTP tidak terbaca jelas atau data tidak sesuai dokumen..."
-                    value={rejectReason}
-                    onChange={(e) => setRejectReason(e.target.value)}
-                  />
-                  <div className="flex gap-3">
-                    <button onClick={() => setShowRejectForm(false)} className="px-6 py-2 text-sm font-bold text-gray-500">Batal</button>
-                    <button 
-                      onClick={() => handleReject(selectedReg.id)}
-                      disabled={!rejectReason.trim()}
-                      className={`px-8 py-2 text-sm font-bold text-white rounded-lg transition-all ${!rejectReason.trim() ? 'bg-gray-300' : 'bg-red-600 hover:bg-red-700'}`}
-                    >
-                      KONFIRMASI TOLAK
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {selectedReg.status === 'Disetujui' && (
-                <div className="mb-4">
-                  {qrCodeData ? (
-                    <PDFDownloadLink
-                      document={
-                        <LibraryCardPDF 
-                          registration={{
-                            fullname: selectedReg.fullname,
-                            ticketNumber: selectedReg.ticketNumber
-                          }}
-                          qrCodeUrl={qrCodeData}
-                          pasFotoPublicUrl={getImageUrl(selectedReg.pasFotoUrl || '', 'pas-foto') || ''}
-                        />
-                      }
-                      fileName={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
-                    >
-                      {({ loading }) => (
-                        <button 
-                          disabled={loading}
-                          className="w-full py-3 bg-[#1e3a5f] text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-blue-800 transition-colors shadow-lg"
-                        >
-                          {loading ? 'MENYIAPKAN DOKUMEN...' : '📥 DOWNLOAD KARTU DIGITAL'}
-                        </button>
-                      )}
-                    </PDFDownloadLink>
-                  ) : (
-                    <div className="w-full py-3 bg-gray-100 text-gray-400 font-bold rounded-xl flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
-                      GENERATING QR CODE...
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {selectedReg.status !== 'Menunggu' && (
-                <button 
-                  onClick={() => setShowModal(false)}
-                  className="w-full py-3 bg-gray-200 text-gray-700 font-bold rounded-xl"
-                >
-                  TUTUP DETAIL
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TOAST NOTIFICATION */}
       {toast && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in zoom-in slide-in-from-bottom-10">
-          <div className="bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3">
-            <span className="text-sm font-medium">{toast}</span>
-          </div>
-        </div>
+        <Toast message={toast} />
       )}
     </div>
   )
