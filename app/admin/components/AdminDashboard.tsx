@@ -201,56 +201,67 @@ export default function AdminDashboard() {
   }
 
   const handleReject = async (id: number) => {
-    if (!rejectReason.trim()) return
-    const reg = registrations.find(r => r.id === id)
-    if (!reg) return
-
-    const { error } = await supabase
-      .from('registrations')
-      .update({ status: 'Ditolak', reject_reason: rejectReason })
-      .eq('id', id)
-
-    if (error) {
-      showToast('❌ Gagal mengupdate status. Coba lagi.')
-      return
-    }
-
-    const currentReason = rejectReason
-    
-    setRegistrations(prev => prev.map(r => 
-      r.id === id ? { ...r, status: 'Ditolak', rejectReason: currentReason, reject_reason: currentReason } : r
-    ))
-    
-    setShowModal(false)
-    setShowRejectForm(false)
-    setRejectReason('')
-    showToast('❌ Pendaftaran telah ditolak.')
-
-    // Notify API
-    const payload = {
-      type: 'STATUS_REJECTED',
-      email: reg.email,
-      fullname: reg.fullname,
-      ticketNumber: (reg as any).ticket_no || (reg as any).ticketNo,
-      rejectReason: currentReason
-    }
-
-    console.log('Sending payload:', payload)
-
-    try {
-      const response = await fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-
-      if (!response.ok) {
-        throw new Error(`Notification failed with status: ${response.status}`)
-      }
-    } catch (err) {
-      console.error('Email rejection error:', err)
-    }
+  console.log("Memulai proses penolakan untuk ID:", id); // LOG 1
+  
+  if (!rejectReason.trim()) {
+    alert("Alasan tidak boleh kosong!");
+    return;
   }
+
+  const reg = registrations.find(r => r.id === id);
+  if (!reg) {
+    console.error("Data pendaftar tidak ditemukan di state!"); // LOG 2
+    return;
+  }
+
+  const tNumber = (reg as any).ticket_no || (reg as any).ticketNo;
+  const currentReason = rejectReason;
+
+  // Update Database
+  const { error } = await supabase
+    .from('registrations')
+    .update({ status: 'Ditolak', reject_reason: currentReason })
+    .eq('id', id);
+
+  if (error) {
+    console.error("Gagal update Supabase:", error);
+    showToast('❌ Gagal update database');
+    return;
+  }
+
+  // JIKA DATABASE BERHASIL, PAKSA KIRIM EMAIL
+  console.log("Database OK, mengirim email ke:", reg.email); // LOG 3
+
+  try {
+    const response = await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'STATUS_REJECTED',
+        email: reg.email,
+        fullname: reg.fullname,
+        ticketNumber: tNumber,
+        rejectReason: currentReason
+      })
+    });
+
+    const result = await response.json();
+    console.log("Respon API Notify:", result); // LOG 4
+
+    if (response.ok) {
+      setRegistrations(prev => prev.map(r => r.id === id ? { ...r, status: 'Ditolak', reject_reason: currentReason } : r));
+      setShowModal(false);
+      setShowRejectForm(false);
+      setRejectReason('');
+      showToast('✅ Berhasil ditolak & Email dikirim.');
+    } else {
+      alert("API Error: " + (result.error?.message || result.error));
+    }
+  } catch (err) {
+    console.error("Fatal Fetch Error:", err);
+    alert("Koneksi ke API terputus!");
+  }
+};
 
   const filtered = registrations.filter(r => {
     const matchFilter = activeFilter === 'Semua' || r.status === activeFilter
