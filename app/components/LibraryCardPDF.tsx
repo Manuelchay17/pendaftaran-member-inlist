@@ -155,6 +155,7 @@ export const LibraryCardPDF = ({ registration, qrCodeUrl, pasFotoPublicUrl }: Li
             <View style={styles.mainArea}>
               <View style={styles.photoContainer}>
                 {pasFotoPublicUrl ? (
+                  // eslint-disable-next-line jsx-a11y/alt-text
                   <Image src={pasFotoPublicUrl} style={styles.photo} />
                 ) : (
                   <View style={styles.photo} />
@@ -182,6 +183,7 @@ export const LibraryCardPDF = ({ registration, qrCodeUrl, pasFotoPublicUrl }: Li
               
               <View style={styles.qrContainer}>
                 {qrCodeUrl && (
+                  // eslint-disable-next-line jsx-a11y/alt-text
                   <Image src={qrCodeUrl} style={styles.qrCode} />
                 )}
                 <Text style={styles.scanText}>Scan untuk Verifikasi</Text>

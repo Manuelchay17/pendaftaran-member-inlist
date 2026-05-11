@@ -62,25 +62,6 @@ export default function AdminDashboard() {
 
 
 
-  const generateQRCode = async (ticketNo: string) => {
-    try {
-      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pendaftaran-perpus-batang.vercel.app'
-      const url = `${baseUrl}/cek-status?tiket=${ticketNo}`
-      const qrData = await QRCode.toDataURL(url, {
-        margin: 1,
-        width: 150,
-        errorCorrectionLevel: 'H',
-        color: {
-          dark: '#1e3a5f',
-          light: '#ffffff'
-        }
-      })
-      setQrCodeData(qrData)
-    } catch (err) {
-      console.error('Error generating QR code:', err)
-    }
-  }
-
   const fetchRegistrations = async () => {
     setIsLoadingData(true)
     try {
@@ -138,18 +119,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (isLoggedIn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchRegistrations()
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn])
 
   useEffect(() => {
   if (selectedReg && selectedReg.status === 'Disetujui') {
-    // 1. Tentukan Base URL secara pintar
-    // Jika ada environment variable, pakai itu. Jika tidak, pakai origin saat ini.
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
     
-    // 2. Gabungkan menjadi URL verifikasi
     const verifyUrl = `${baseUrl}/cek-status?tiket=${selectedReg.ticketNo}`;
     
     QRCode.toDataURL(verifyUrl, { width: 300, margin: 2 })
@@ -190,13 +168,11 @@ export default function AdminDashboard() {
       return
     }
 
-    // Update local state
     setRegistrations(prev => prev.map(r =>
       r.id === id ? { ...r, status: 'Disetujui' } : r
     ))
     setShowModal(false)
 
-    // Send approval email (non-blocking)
     fetch('/api/notify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -204,7 +180,7 @@ export default function AdminDashboard() {
         type: 'STATUS_APPROVED',
         email: reg.email,
         fullname: reg.fullname,
-        ticketNumber: (reg as any).ticket_no
+        ticketNumber: (reg as unknown as { ticket_no: string }).ticket_no
       })
     }).catch(err => console.error('Email approval error:', err))
 
@@ -230,7 +206,6 @@ export default function AdminDashboard() {
       setRejectReason('')
       showToast('❌ Pendaftaran telah ditolak.')
 
-      // Send rejection email (non-blocking)
       fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -238,7 +213,7 @@ export default function AdminDashboard() {
           type: 'STATUS_REJECTED',
           email: reg.email,
           fullname: reg.fullname,
-          ticketNumber: (reg as any).ticket_no,
+          ticketNumber: (reg as unknown as { ticket_no: string }).ticket_no,
           rejectReason: currentReason
         })
       }).catch(err => console.error('Email rejection error:', err))
@@ -260,17 +235,13 @@ export default function AdminDashboard() {
     ditolak: registrations.filter(r=>r.status==='Ditolak').length 
   }
 
-  // Ambil URL dari .env.local
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
   if (!path) return null;
   
-  // Bersihkan path dari spasi yang tidak sengaja terinput
   const cleanPath = path.trim();
   
-  // Logika: Jika di database 'cleanPath' belum ada folder/ (garis miring), 
-  // kita tambahkan foldernya secara otomatis.
   const finalPath = cleanPath.includes('/') ? cleanPath : `${folder}/${cleanPath}`;
 
   return `${supabaseUrl}/storage/v1/object/public/dokumen-anggota/${finalPath}`;
@@ -302,7 +273,6 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900 pb-20">
-      {/* HEADER */}
       <header className="text-white py-6 px-6 shadow-md" style={{backgroundColor:'#1e3a5f'}}>
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
@@ -333,7 +303,6 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
             <button onClick={fetchRegistrations} className="ml-auto text-xs underline">Coba lagi</button>
           </div>
         )}
-        {/* STATS CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-yellow-500">
             <div className="flex items-center justify-between">
@@ -364,13 +333,12 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
           </div>
         </div>
 
-        {/* FILTERS & SEARCH */}
         <div className="bg-white p-4 rounded-t-xl shadow-sm border-b flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex bg-gray-100 p-1 rounded-lg w-full md:w-auto">
             {['Semua', 'Menunggu', 'Disetujui', 'Ditolak'].map((f) => (
               <button
                 key={f}
-                onClick={() => setActiveFilter(f as any)}
+                onClick={() => setActiveFilter(f as 'Semua' | RegistrationStatus)}
                 className={`px-4 py-2 text-xs font-bold rounded-md transition-all ${activeFilter === f ? 'bg-white shadow-sm text-blue-900' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 {f}
@@ -389,7 +357,6 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
           </div>
         </div>
 
-        {/* TABLE */}
         <div className="bg-white rounded-b-xl shadow-sm overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -442,7 +409,6 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
         </div>
       </main>
 
-      {/* DETAIL MODAL */}
       {showModal && selectedReg && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl flex flex-col">
@@ -455,7 +421,6 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
             </div>
 
             <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Personal Info */}
               <div className="space-y-6">
                 <div>
                   <h3 className="text-xs font-bold text-blue-900 uppercase tracking-widest mb-3 border-b pb-1">Data Pribadi</h3>
@@ -487,7 +452,6 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
                 </div>
               </div>
 
-              {/* Document Previews */}
               <div className="space-y-6">
                 <div>
                   <h3 className="text-xs font-bold text-blue-900 uppercase tracking-widest mb-3 border-b pb-1">Berkas Lampiran</h3>
@@ -497,7 +461,7 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
                       {selectedReg.pas_foto_url ? (
                         <img
                           src={getImageUrl(selectedReg.pas_foto_url, 'pas-foto') || ''}
-                          alt="Pas Foto"
+                          alt="Pas Foto Anggota"
                           className="w-full rounded-lg border border-gray-200 object-cover aspect-[3/4]"
                           onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
                         />
@@ -512,7 +476,7 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
                       {selectedReg.foto_ktp_url ? (
                         <img
                           src={getImageUrl(selectedReg.foto_ktp_url, 'foto-ktp') || ''}
-                          alt="Foto KTP"
+                          alt="Foto KTP Anggota"
                           className="w-full rounded-lg border border-gray-200 object-cover aspect-[3/4]"
                           onError={(e) => { (e.target as HTMLImageElement).src = ''; }}
                         />
@@ -534,7 +498,6 @@ const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
               </div>
             </div>
 
-            {/* ACTION FOOTER */}
             <div className="p-6 border-t bg-gray-50 rounded-b-2xl">
               {selectedReg.status === 'Menunggu' && !showRejectForm && (
                 <div className="flex gap-4">

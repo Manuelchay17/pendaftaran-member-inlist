@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -23,13 +23,13 @@ interface SearchResult {
 type SearchState = 'idle' | 'loading' | 'not_found' | 'found'
 
 function CekStatusInner() {
-  const [ticketInput, setTicketInput] = useState('')
+  const searchParams = useSearchParams()
+  const [ticketInput, setTicketInput] = useState(() => searchParams.get('tiket')?.toUpperCase() || '')
   const [searchState, setSearchState] = useState<SearchState>('idle')
   const [result, setResult] = useState<SearchResult | null>(null)
   const [qrCodeData, setQrCodeData] = useState<string>('')
-  const searchParams = useSearchParams()
 
-  const handleSearch = async (overrideTicket?: string) => {
+  const handleSearch = useCallback(async (overrideTicket?: string) => {
     const ticket = (overrideTicket || ticketInput).toUpperCase().trim()
     if (!ticket) return
 
@@ -48,11 +48,11 @@ function CekStatusInner() {
       setResult(data as SearchResult)
       setSearchState('found')
     }
-  }
+  }, [ticketInput])
 
 
 
-  const generateQRCode = async (ticketNo: string) => {
+  const generateQRCode = useCallback(async (ticketNo: string) => {
     try {
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://pendaftaran-perpus-batang.vercel.app'
       const url = `${baseUrl}/cek-status?tiket=${ticketNo}`
@@ -69,22 +69,23 @@ function CekStatusInner() {
     } catch (err) {
       console.error('Error generating QR code:', err)
     }
-  }
+  }, [])
 
   // Auto-search jika ada ?tiket= di URL
   useEffect(() => {
     const tiketFromUrl = searchParams.get('tiket')
     if (tiketFromUrl) {
-      setTicketInput(tiketFromUrl.toUpperCase())
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       handleSearch(tiketFromUrl)
     }
-  }, [])
+  }, [searchParams, handleSearch])
 
   useEffect(() => {
     if (result && result.status === 'Disetujui') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       generateQRCode(result.ticket_no)
     }
-  }, [result])
+  }, [result, generateQRCode])
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
