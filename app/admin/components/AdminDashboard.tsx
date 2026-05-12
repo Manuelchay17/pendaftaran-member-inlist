@@ -1,7 +1,11 @@
 'use client'
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import QRCode from 'qrcode'
-import { RefreshCw, LogOut, Lock, LayoutDashboard, ShieldAlert } from 'lucide-react'
+import { 
+  RefreshCw, LogOut, Lock, LayoutDashboard, ShieldAlert, 
+  KeyRound, Loader2, Save, X 
+} from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 import { Registration, RegistrationStatus } from '@/types'
 import { ADMIN_CONFIG } from '@/lib/constants'
@@ -27,15 +31,44 @@ export default function AdminDashboard() {
     setRejectReason
   } = useRegistrations()
 
+  // Auth States
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [loginUser, setLoginUser] = useState('')
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [loginEmail, setLoginEmail] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
+
+  // Password Modal States
+  const [showPassModal, setShowPassModal] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [isUpdatingPass, setIsUpdatingPass] = useState(false)
   
   const [activeFilter, setActiveFilter] = useState<'Semua'|RegistrationStatus>('Semua')
   const [searchQuery, setSearchQuery] = useState('')
   const [toast, setToast] = useState('')
   const [qrCodeData, setQrCodeData] = useState<string>('')
+
+  // Check Session on Mount
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsLoggedIn(!!session)
+      setIsLoadingAuth(false)
+    }
+
+    checkSession()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session)
+      if (!session) {
+        // Reset sensitive states on logout
+        setSearchQuery('')
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -54,12 +87,51 @@ export default function AdminDashboard() {
     }
   }, [selectedReg]);
 
-  const handleLogin = () => {
-    if (loginUser === ADMIN_CONFIG.USERNAME && loginPass === ADMIN_CONFIG.PASSWORD) {
-      setIsLoggedIn(true)
-      setLoginError('')
-    } else {
-      setLoginError('Username atau password salah!')
+  const handleLogin = async () => {
+    if (!loginEmail || !loginPass) {
+      setLoginError('Email dan password wajib diisi!')
+      return
+    }
+
+    setIsLoggingIn(true)
+    setLoginError('')
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPass,
+      })
+
+      if (error) throw error
+    } catch (err: any) {
+      setLoginError(err.message === 'Invalid login credentials' ? 'Email atau password salah!' : err.message)
+    } finally {
+      setIsLoggingIn(false)
+    }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    setIsLoggedIn(false)
+  }
+
+  const handleUpdatePassword = async () => {
+    if (newPassword.length < 6) {
+      showToast('⚠️ Password minimal 6 karakter')
+      return
+    }
+
+    setIsUpdatingPass(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      showToast('✅ Password berhasil diperbarui!')
+      setShowPassModal(false)
+      setNewPassword('')
+    } catch (err: any) {
+      showToast('❌ Gagal: ' + err.message)
+    } finally {
+      setIsUpdatingPass(false)
     }
   }
 
@@ -111,6 +183,14 @@ export default function AdminDashboard() {
     return `${supabaseUrl}/storage/v1/object/public/${ADMIN_CONFIG.STORAGE_BUCKET}/${finalPath}`;
   };
 
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-900" size={48} />
+      </div>
+    )
+  }
+
   if (!isLoggedIn) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]">
       <div className="bg-white rounded-3xl shadow-2xl shadow-blue-900/10 p-10 w-full max-w-md border border-gray-100 animate-in fade-in zoom-in duration-500">
@@ -131,13 +211,14 @@ export default function AdminDashboard() {
 
         <div className="space-y-5">
           <div>
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Username</label>
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1">Email Admin</label>
             <input 
               className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-5 py-3.5 text-sm focus:bg-white focus:border-blue-900/10 outline-none transition-all" 
-              value={loginUser} 
-              onChange={e=>setLoginUser(e.target.value)} 
+              value={loginEmail} 
+              onChange={e=>setLoginEmail(e.target.value)} 
               onKeyDown={e=>e.key==='Enter'&&handleLogin()} 
-              placeholder="admin.perpus"
+              placeholder="admin@batangkab.go.id"
+              type="email"
             />
           </div>
           <div>
@@ -153,9 +234,14 @@ export default function AdminDashboard() {
           </div>
           <button 
             onClick={handleLogin} 
-            className="w-full py-4 bg-blue-900 rounded-2xl text-white font-bold text-sm transition-all hover:bg-blue-800 active:scale-95 shadow-lg shadow-blue-900/20 mt-4"
+            disabled={isLoggingIn}
+            className="w-full py-4 bg-blue-900 rounded-2xl text-white font-bold text-sm transition-all hover:bg-blue-800 active:scale-95 shadow-lg shadow-blue-900/20 mt-4 flex items-center justify-center gap-2"
           >
-            MASUK KE DASHBOARD
+            {isLoggingIn ? (
+              <><Loader2 className="animate-spin" size={18} /> MEMPROSES...</>
+            ) : (
+              'MASUK KE DASHBOARD'
+            )}
           </button>
         </div>
       </div>
@@ -171,22 +257,30 @@ export default function AdminDashboard() {
               <LayoutDashboard size={20} />
             </div>
             <div>
-              <h1 className="text-lg font-extrabold text-blue-900 leading-none">DASHBOARD ADMIN</h1>
+              <h1 className="text-lg font-extrabold text-blue-900 leading-none text-wrap max-w-[150px] md:max-w-none">DASHBOARD ADMIN</h1>
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Dispuspa Kab. Batang</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
+            <button 
+              onClick={() => setShowPassModal(true)}
+              className="p-2.5 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all active:scale-95 text-blue-900 flex items-center gap-2 px-3 md:px-4"
+              title="Ganti Password"
+            >
+              <KeyRound size={16} />
+              <span className="text-xs font-bold md:block hidden">Sandi</span>
+            </button>
             <button 
               onClick={fetchRegistrations} 
-              className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all active:scale-95 text-gray-500 flex items-center gap-2 px-4"
+              className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all active:scale-95 text-gray-500 flex items-center gap-2 px-3 md:px-4"
             >
               <RefreshCw size={16} className={isLoadingData ? 'animate-spin' : ''} />
               <span className="text-xs font-bold md:block hidden">Refresh</span>
             </button>
             <button 
-              onClick={() => setIsLoggedIn(false)} 
-              className="p-2.5 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all active:scale-95 text-rose-600 flex items-center gap-2 px-4"
+              onClick={handleLogout} 
+              className="p-2.5 bg-rose-50 hover:bg-rose-100 rounded-xl transition-all active:scale-95 text-rose-600 flex items-center gap-2 px-3 md:px-4"
             >
               <LogOut size={16} />
               <span className="text-xs font-bold md:block hidden">Keluar</span>
@@ -244,6 +338,42 @@ export default function AdminDashboard() {
           setRejectReason={setRejectReason}
         />
       </main>
+
+      {/* Change Password Modal */}
+      {showPassModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm border border-gray-100" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold text-blue-900 flex items-center gap-2">
+                <KeyRound size={20} /> Ganti Password
+              </h2>
+              <button onClick={() => setShowPassModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Password Baru</label>
+                <input 
+                  type="password" 
+                  className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-5 py-3 text-sm focus:bg-white focus:border-blue-900/10 outline-none transition-all" 
+                  value={newPassword} 
+                  onChange={e => setNewPassword(e.target.value)} 
+                  placeholder="Min. 6 karakter"
+                />
+              </div>
+              <button 
+                onClick={handleUpdatePassword}
+                disabled={isUpdatingPass || newPassword.length < 6}
+                className="w-full py-3 bg-blue-900 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-800 transition-all active:scale-95 disabled:bg-gray-300 disabled:active:scale-100"
+              >
+                {isUpdatingPass ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                SIMPAN PERUBAHAN
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <Toast message={toast} />
