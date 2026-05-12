@@ -8,6 +8,10 @@ export function useRegistrations() {
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [fetchError, setFetchError] = useState('')
 
+  const [selectedReg, setSelectedReg] = useState<Registration | null>(null)
+  const [showRejectForm, setShowRejectForm] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+
   const fetchRegistrations = useCallback(async () => {
     try {
       setIsLoadingData(true)
@@ -104,6 +108,8 @@ export function useRegistrations() {
       fullname: reg.fullname,
       ticketNumber: reg.ticketNumber
     })
+
+    setSelectedReg(null)
   }
 
   const handleReject = async (reg: Registration, reason: string) => {
@@ -133,6 +139,10 @@ export function useRegistrations() {
       ticketNumber: reg.ticketNumber,
       rejectReason: reason
     })
+
+    setSelectedReg(null)
+    setShowRejectForm(false)
+    setRejectReason('')
   }
 
   return {
@@ -142,6 +152,12 @@ export function useRegistrations() {
     fetchRegistrations,
     handleApprove,
     handleReject,
-    sendNotification
+    sendNotification,
+    selectedReg,
+    setSelectedReg,
+    showRejectForm,
+    setShowRejectForm,
+    rejectReason,
+    setRejectReason
   }
 }

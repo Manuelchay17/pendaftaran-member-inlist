@@ -31,8 +31,14 @@ export function ActionModals({
   if (!selectedReg) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl flex flex-col">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="p-6 border-b flex justify-between items-center bg-gray-50 rounded-t-2xl">
           <div>
             <h2 className="text-xl font-bold text-blue-900">Detail Pendaftaran Anggota</h2>

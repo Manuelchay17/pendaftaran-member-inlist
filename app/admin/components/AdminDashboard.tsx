@@ -17,7 +17,13 @@ export default function AdminDashboard() {
     fetchError, 
     fetchRegistrations, 
     handleApprove, 
-    handleReject 
+    handleReject,
+    selectedReg,
+    setSelectedReg,
+    showRejectForm,
+    setShowRejectForm,
+    rejectReason,
+    setRejectReason
   } = useRegistrations()
 
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -27,10 +33,6 @@ export default function AdminDashboard() {
   
   const [activeFilter, setActiveFilter] = useState<'Semua'|RegistrationStatus>('Semua')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedReg, setSelectedReg] = useState<Registration|null>(null)
-  const [showModal, setShowModal] = useState(false)
-  const [showRejectForm, setShowRejectForm] = useState(false)
-  const [rejectReason, setRejectReason] = useState('')
   const [toast, setToast] = useState('')
   const [qrCodeData, setQrCodeData] = useState<string>('')
 
@@ -70,7 +72,6 @@ export default function AdminDashboard() {
     try {
       await handleApprove(reg)
       showToast('✅ Pendaftaran berhasil disetujui!')
-      setShowModal(false)
     } catch (err: any) {
       showToast('❌ ' + err.message)
     }
@@ -81,9 +82,6 @@ export default function AdminDashboard() {
     try {
       await handleReject(selectedReg, rejectReason)
       showToast('✅ Pendaftaran telah ditolak.')
-      setShowRejectForm(false)
-      setShowModal(false)
-      setRejectReason('')
     } catch (err: any) {
       showToast('❌ ' + err.message)
     }
@@ -180,7 +178,6 @@ export default function AdminDashboard() {
           setSearchQuery={setSearchQuery}
           onSelect={(reg) => {
             setSelectedReg(reg)
-            setShowModal(true)
             setShowRejectForm(false)
           }}
         />
@@ -188,7 +185,7 @@ export default function AdminDashboard() {
         <ActionModals 
           selectedReg={selectedReg}
           onClose={() => {
-            setShowModal(false)
+            setSelectedReg(null)
             setShowRejectForm(false)
           }}
           onApprove={onApprove}
