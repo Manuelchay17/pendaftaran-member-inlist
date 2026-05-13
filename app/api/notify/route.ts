@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
     // Send Email via Resend
     const { data, error } = await resend.emails.send({
-      from: 'Layanan Perpustakaan Batang <noreply@pendaftaran-perpus-batang.my.id>',
+      from: 'Layanan Perpustakaan Batang <admin@pendaftaran-perpus-batang.my.id>',
       to: email,
       subject: subject,
       html: html,
