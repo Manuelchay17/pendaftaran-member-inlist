@@ -44,14 +44,18 @@ export async function GET(request: Request) {
       }
     });
 
-    // 2. Format URL gambar profil (Lokal /uploads)
+    // 2. Format URL gambar profil (Lokal /uploads atau Absolut)
     let pasFotoPublicUrl = '';
     if (registration.pas_foto_url) {
       const cleanPath = registration.pas_foto_url.trim();
-      const imagePath = cleanPath.startsWith('/uploads/') 
-        ? cleanPath 
-        : `/uploads/${cleanPath}`;
-      pasFotoPublicUrl = `${baseUrl}${imagePath}`;
+      if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+        pasFotoPublicUrl = cleanPath;
+      } else {
+        const imagePath = cleanPath.startsWith('/uploads/') 
+          ? cleanPath 
+          : `/uploads/${cleanPath}`;
+        pasFotoPublicUrl = `${baseUrl}${imagePath}`;
+      }
     }
 
     // 3. Render PDF ke stream
