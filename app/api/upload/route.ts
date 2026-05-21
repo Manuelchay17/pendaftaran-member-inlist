@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     phpFormData.append('filename', fileName);   // Mengirim nama file unik buatan Next.js ke PHP
 
     // 6. Lempar file-nya menembak script upload.php di Hostinger
-    const phpResponse = await fetch('https://api-repo.pendaftaran-perpus-batang.my.id/upload.php', {
+    const phpResponse = await fetch('https://api.pendaftaran-perpus-batang.my.id/upload.php', {
       method: 'POST',
       headers: {
         'X-UPLOAD-SECRET': 'dispuspa-batang-upload-secret-key-2026' // Kunci otentikasi rahasia internal
