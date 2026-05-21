@@ -1,7 +1,5 @@
 import React from 'react'
 import Link from 'next/link'
-import { PDFDownloadLink } from '@react-pdf/renderer'
-import { LibraryCardPDF } from '@/app/components/LibraryCardPDF'
 import { ProgressSteps } from '@/app/components/ui/ProgressSteps'
 import { Registration } from '@/types'
 import { Clock, CheckCircle2, XCircle, Info, Download, Mail, RotateCcw, Loader2 } from 'lucide-react'
@@ -9,11 +7,10 @@ import { Clock, CheckCircle2, XCircle, Info, Download, Mail, RotateCcw, Loader2 
 interface StatusCardProps {
   result: Partial<Registration>
   qrCodeData: string
-  getImageUrl: (path: string) => string | null
   formatDate: (iso: string | null | undefined) => string
 }
 
-export function StatusCard({ result, qrCodeData, getImageUrl, formatDate }: StatusCardProps) {
+export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
       {/* MENUNGGU */}
@@ -113,43 +110,15 @@ export function StatusCard({ result, qrCodeData, getImageUrl, formatDate }: Stat
 
             <div className="pt-4">
               {qrCodeData ? (
-                <PDFDownloadLink
-                  document={
-                    <LibraryCardPDF 
-                      registration={{
-                        fullname: result.fullname || '',
-                        ticketNumber: result.ticketNumber || ''
-                      }}
-                      qrCodeUrl={qrCodeData}
-                      pasFotoPublicUrl={getImageUrl(result.pasFotoUrl || '') || ''}
-                    />
-                  }
-                  fileName={`KARTU-PERPUS-${(result.fullname || 'UNKNOWN').toUpperCase().replace(/\s+/g, '-')}.pdf`}
+                <a 
+                  href={`/api/download-card?tiket=${result.ticketNumber}`}
+                  download={`KARTU-PERPUS-${(result.fullname || 'UNKNOWN').toUpperCase().replace(/\s+/g, '-')}.pdf`}
+                  className="group relative w-full py-5 rounded-2xl bg-[#1e3a5f] hover:bg-blue-900 hover:shadow-blue-900/20 text-white font-black text-lg overflow-hidden transition-all duration-300 active:scale-95 shadow-xl flex items-center justify-center gap-3"
                 >
-                  {({ loading }) => (
-                    <button 
-                      disabled={loading}
-                      className={`group relative w-full py-5 rounded-2xl text-white font-black text-lg overflow-hidden transition-all duration-300 active:scale-95 shadow-xl ${
-                        loading ? 'bg-gray-400' : 'bg-[#1e3a5f] hover:bg-blue-900 hover:shadow-blue-900/20'
-                      }`}
-                    >
-                      <div className="relative z-10 flex items-center justify-center gap-3">
-                        {loading ? (
-                          <>
-                            <Loader2 className="animate-spin" size={24} />
-                            <span>MENYIAPKAN KARTU...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Download size={24} className="group-hover:translate-y-1 transition-transform" />
-                            <span>DOWNLOAD KARTU DIGITAL</span>
-                          </>
-                        )}
-                      </div>
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                    </button>
-                  )}
-                </PDFDownloadLink>
+                  <Download size={24} className="group-hover:translate-y-1 transition-transform" />
+                  <span>DOWNLOAD KARTU DIGITAL</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                </a>
               ) : (
                 <div className="w-full py-5 bg-gray-50 border border-gray-100 text-gray-400 font-bold rounded-2xl flex items-center justify-center gap-3">
                   <Loader2 className="animate-spin text-gray-300" size={24} />

@@ -152,7 +152,6 @@ function CekStatusInner() {
           <StatusCard 
             result={result} 
             qrCodeData={qrCodeData} 
-            getImageUrl={getImageUrl} 
             formatDate={formatDate} 
           />
         )}

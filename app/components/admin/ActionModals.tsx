@@ -1,11 +1,9 @@
 import React from 'react'
-import { PDFDownloadLink } from '@react-pdf/renderer'
 import { 
   X, User, MapPin, Phone, Mail, School, 
   CheckCircle2, XCircle, Download, Loader2, 
   Info, Heart, ShieldAlert, CreditCard, Calendar, Eye
 } from 'lucide-react'
-import { LibraryCardPDF } from '@/app/components/LibraryCardPDF'
 import { Registration } from '@/types'
 
 interface ActionModalsProps {
@@ -285,32 +283,13 @@ export function ActionModals({
           {selectedReg.status === 'Disetujui' && (
             <div className="w-full">
               {qrCodeData ? (
-                <PDFDownloadLink
-                  document={
-                    <LibraryCardPDF 
-                      registration={{
-                        fullname: selectedReg.fullname,
-                        ticketNumber: selectedReg.ticketNumber
-                      }}
-                      qrCodeUrl={qrCodeData}
-                      pasFotoPublicUrl={resolveImageUrl(selectedReg.pasFotoUrl)}
-                    />
-                  }
-                  fileName={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
+                <a 
+                  href={`/api/download-card?tiket=${selectedReg.ticketNumber}`}
+                  download={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
+                  className="w-full py-4 bg-gradient-to-r from-blue-900 to-indigo-900 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:opacity-95 transition-all duration-200 active:scale-95 shadow-xl shadow-blue-200"
                 >
-                  {({ loading }) => (
-                    <button 
-                      disabled={loading}
-                      className="w-full py-4 bg-gradient-to-r from-blue-900 to-indigo-900 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:opacity-95 transition-all duration-200 active:scale-95 shadow-xl shadow-blue-200"
-                    >
-                      {loading ? (
-                        <><Loader2 className="animate-spin" size={20} /> MENYIAPKAN...</>
-                      ) : (
-                        <><Download size={20} /> UNDUH KARTU DIGITAL</>
-                      )}
-                    </button>
-                  )}
-                </PDFDownloadLink>
+                  <Download size={20} /> UNDUH KARTU DIGITAL
+                </a>
               ) : (
                 <div className="w-full py-4 bg-gray-100 text-gray-400 font-bold rounded-2xl flex items-center justify-center gap-3">
                   <Loader2 className="animate-spin" size={20} />
