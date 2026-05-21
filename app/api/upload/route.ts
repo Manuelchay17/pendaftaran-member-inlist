@@ -1,58 +1,71 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-    const type = formData.get('type') as string // 'pas_foto' | 'foto_ktp'
-    const ticketNo = formData.get('ticket_no') as string
+    const formData = await req.formData();
+    const file = formData.get('file') as File;
+    const type = formData.get('type') as string; // 'pas_foto' | 'foto_ktp'
+    const ticketNo = formData.get('ticket_no') as string;
 
+    // 1. Validasi Inputan Awal di sisi Next.js (Vercel)
     if (!file || !type || !ticketNo) {
-      return NextResponse.json({ error: 'file, type, dan ticket_no wajib diisi' }, { status: 400 })
+      return NextResponse.json({ error: 'file, type, dan ticket_no wajib diisi' }, { status: 400 });
     }
 
-    // Validasi ukuran (max 2MB)
+    // 2. Validasi Ukuran (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
-      return NextResponse.json({ error: 'Ukuran file melebihi 2MB' }, { status: 400 })
+      return NextResponse.json({ error: 'Ukuran file melebihi 2MB' }, { status: 400 });
     }
 
-    // Validasi tipe file
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png']
+    // 3. Validasi Tipe Berkas File
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
     if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ error: 'Format file harus JPG atau PNG' }, { status: 400 })
+      return NextResponse.json({ error: 'Format file harus JPG atau PNG' }, { status: 400 });
     }
 
-    // Buat nama file unik
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const fileName = `${type}_${ticketNo}_${Date.now()}.${ext}`
-    const folder = type === 'pas_foto' ? 'pas_foto' : 'foto_ktp'
+    // 4. Buat Nama File Unik Berdasarkan Aturan Asli Proyek Kamu
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `${type}_${ticketNo}_${Date.now()}.${ext}`;
+    const folder = type === 'pas_foto' ? 'pas_foto' : 'foto_ktp';
 
-    // Path upload di Hostinger
-    const uploadDir = process.env.UPLOAD_DIR || '/home/u158561617/public_html/uploads'
-    const dirPath = path.join(uploadDir, folder)
-    const filePath = path.join(dirPath, fileName)
+    // 5. Bungkus kembali datanya ke FormData baru untuk diteruskan ke PHP Hostinger
+    const phpFormData = new FormData();
+    phpFormData.append('file', file);
+    phpFormData.append('type', folder);         // Mengirim 'pas_foto' atau 'foto_ktp'
+    phpFormData.append('filename', fileName);   // Mengirim nama file unik buatan Next.js ke PHP
 
-    // Buat folder jika belum ada
-    await mkdir(dirPath, { recursive: true })
+    // 6. Lempar file-nya menembak script upload.php di Hostinger
+    const phpResponse = await fetch('https://pendaftaran-perpus-batang.my.id/upload.php', {
+      method: 'POST',
+      headers: {
+        'X-UPLOAD-SECRET': 'dispuspa-batang-upload-secret-key-2026' // Kunci otentikasi rahasia internal
+      },
+      body: phpFormData
+    });
 
-    // Simpan file
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-    await writeFile(filePath, buffer)
+    // Jika server Hostinger menolak request/down
+    if (!phpResponse.ok) {
+      const errorText = await phpResponse.text();
+      console.error('PHP Upload Error:', errorText);
+      return NextResponse.json({ error: 'Gagal melakukan upload ke server repositori utama' }, { status: phpResponse.status });
+    }
 
-    // URL publik file
-    const publicUrl = `/uploads/${folder}/${fileName}`
+    const data = await phpResponse.json();
 
+    // Jika script PHP mengembalikan error validasi internal
+    if (data.error) {
+      return NextResponse.json({ error: data.error }, { status: 400 });
+    }
+
+    // 7. Kembalikan response sukses beserta URL publik absolut gambar Hostinger ke Frontend
     return NextResponse.json({
       success: true,
-      url: publicUrl,
-      fileName
-    })
+      url: data.url, // Menggunakan URL absolut dari Hostinger (misal: https://pendaftaran-perpus-batang.my.id/uploads/...)
+      fileName: fileName
+    });
 
   } catch (err: any) {
-    console.error('Upload error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('Upload error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
