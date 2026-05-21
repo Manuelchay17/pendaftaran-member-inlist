@@ -1,197 +1,165 @@
-'use client'
-import { Document, Page, Text, View, Image, StyleSheet } from '@react-pdf/renderer';
+import React from 'react'
+import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 
+// Definisikan style dengan standar react-pdf
 const styles = StyleSheet.create({
   page: {
-    padding: 0,
+    flexDirection: 'column',
     backgroundColor: '#ffffff',
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   card: {
-    width: 320,
-    height: 200,
+    width: 400,
+    height: 250,
+    backgroundColor: '#1e3a5f',
+    borderRadius: 16,
+    padding: 16,
     position: 'relative',
-    backgroundColor: '#1e3a5f', 
     color: '#ffffff',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(30, 58, 95, 0.4)', 
-  },
-  content: {
-    padding: 15,
-    zIndex: 10,
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
   },
   header: {
-    display: 'flex',
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-    borderBottom: '1px solid #c8a84b',
-    paddingBottom: 5,
-  },
-  headerText: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  title: {
-    fontSize: 10,
+    fontSize: 14,
     fontWeight: 'bold',
-    textTransform: 'uppercase',
+    marginBottom: 4,
     letterSpacing: 1,
-    color: '#ffffff',
   },
-  subtitle: {
-    fontSize: 6,
-    color: '#c8a84b',
-    textTransform: 'uppercase',
+  subHeader: {
+    fontSize: 8,
+    color: '#cbd5e1',
+    marginBottom: 15,
   },
-  mainArea: {
-    display: 'flex',
+  body: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    gap: 15,
+    alignItems: 'flex-start',
   },
   photoContainer: {
-    width: 70,
-    height: 90,
-    border: '2px solid #c8a84b',
-    borderRadius: 4,
+    width: 75,
+    height: 100,
+    backgroundColor: '#334155',
+    borderRadius: 6,
     overflow: 'hidden',
-    backgroundColor: '#f3f4f6',
-    marginRight: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    border: '1px solid #475569',
   },
   photo: {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
   },
-  details: {
+  noPhotoText: {
+    fontSize: 8,
+    color: '#94a3b8',
+  },
+  infoContainer: {
     flex: 1,
+    flexDirection: 'column',
+    gap: 8,
+  },
+  fieldGroup: {
+    marginBottom: 6,
   },
   label: {
-    fontSize: 6,
-    color: '#c8a84b',
+    fontSize: 7,
+    color: '#94a3b8',
     textTransform: 'uppercase',
-    marginBottom: 2,
+    letterSpacing: 0.5,
   },
   value: {
     fontSize: 11,
     fontWeight: 'bold',
-    marginBottom: 8,
     color: '#ffffff',
   },
-  ticketNo: {
+  ticketValue: {
     fontSize: 13,
     fontWeight: 'bold',
-    color: '#c8a84b',
-  },
-  footer: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    color: '#38bdf8',
   },
   qrContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  qrCode: {
-    width: 45,
-    height: 45,
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    width: 65,
+    height: 65,
     backgroundColor: '#ffffff',
-    padding: 2,
-    borderRadius: 2,
+    padding: 4,
+    borderRadius: 8,
   },
-  scanText: {
-    fontSize: 5,
-    color: '#ffffff',
-    marginTop: 2,
-    textTransform: 'uppercase',
-  },
-  footerText: {
-    fontSize: 7,
-    fontStyle: 'italic',
-    color: '#ffffff',
+  qrImage: {
+    width: '100%',
+    height: '100%',
   }
-});
+})
 
 interface LibraryCardPDFProps {
   registration: {
-    fullname: string;
-    ticketNumber: string;
-  };
-  qrCodeUrl: string;
-  pasFotoPublicUrl: string;
+    fullname: string
+    ticketNumber: string
+  }
+  qrCodeUrl: string
+  pasFotoPublicUrl: string
 }
 
-export const LibraryCardPDF = ({ registration, qrCodeUrl, pasFotoPublicUrl }: LibraryCardPDFProps) => {
+export function LibraryCardPDF({ registration, qrCodeUrl, pasFotoPublicUrl }: LibraryCardPDFProps) {
+  // Ambil URL saat runtime untuk memastikan host lokal terbaca dengan benar oleh react-pdf
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+
+  // Validasi URL Pas Foto: Jika menggunakan proxy relatif, tambahkan origin domainnya
+  let finalFotoUrl = pasFotoPublicUrl
+  if (finalFotoUrl && finalFotoUrl.startsWith('/')) {
+    finalFotoUrl = `${baseUrl}${finalFotoUrl}`
+  }
+
+  // Validasi URL QR Code
+  let finalQrUrl = qrCodeUrl
+  if (finalQrUrl && finalQrUrl.startsWith('/')) {
+    finalQrUrl = `${baseUrl}${finalQrUrl}`
+  }
+
   return (
     <Document>
-      <Page size={[320, 200]} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         <View style={styles.card}>
-          <View style={styles.overlay} />
+          {/* Header Kartu */}
+          <Text style={styles.header}>KARTU ANGGOTA PERPUSTAKAAN</Text>
+          <Text style={styles.subHeader}>Dinas Perpustakaan dan Kearsipan Kabupaten Batang</Text>
 
-          <View style={styles.content}>
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.headerText}>
-                <Text style={styles.title}>KARTU ANGGOTA PERPUSTAKAAN</Text>
-                <Text style={styles.subtitle}>Dispuspa Kabupaten Batang</Text>
-              </View>
+          {/* Konten Utama */}
+          <View style={styles.body}>
+            {/* Bagian Pas Foto */}
+            <View style={styles.photoContainer}>
+              {finalFotoUrl ? (
+                <Image src={finalFotoUrl} style={styles.photo} />
+              ) : (
+                <Text style={styles.noPhotoText}>NO FOTO</Text>
+              )}
             </View>
 
-            {/* Main Area */}
-            <View style={styles.mainArea}>
-              <View style={styles.photoContainer}>
-                {pasFotoPublicUrl ? (
-                  // eslint-disable-next-line jsx-a11y/alt-text
-                  <Image src={pasFotoPublicUrl} style={styles.photo} />
-                ) : (
-                  <View style={styles.photo} />
-                )}
+            {/* Bagian Data Teks */}
+            <View style={styles.infoContainer}>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Nama Lengkap</Text>
+                <Text style={styles.value}>{registration.fullname.toUpperCase()}</Text>
               </View>
 
-              <View style={styles.details}>
-                <View>
-                  <Text style={styles.label}>Nama Lengkap</Text>
-                  <Text style={styles.value}>{registration.fullname}</Text>
-                </View>
-                <View>
-                  <Text style={styles.label}>Nomor Anggota / Tiket</Text>
-                  <Text style={styles.ticketNo}>{registration.ticketNumber}</Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Footer */}
-            <View style={styles.footer}>
-              <View>
-                <Text style={styles.footerText}>Berlaku selama menjadi anggota</Text>
-                <Text style={styles.footerText}>https://dispuspa.batangkab.go.id</Text>
-              </View>
-              
-              <View style={styles.qrContainer}>
-                {qrCodeUrl && (
-                  // eslint-disable-next-line jsx-a11y/alt-text
-                  <Image src={qrCodeUrl} style={styles.qrCode} />
-                )}
-                <Text style={styles.scanText}>Scan untuk Verifikasi</Text>
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Nomor Tiket / Anggota</Text>
+                <Text style={styles.ticketValue}>{registration.ticketNumber}</Text>
               </View>
             </View>
           </View>
+
+          {/* Bagian QR Code di Pojok Kanan Bawah */}
+          {finalQrUrl ? (
+            <View style={styles.qrContainer}>
+              <Image src={finalQrUrl} style={styles.qrImage} />
+            </View>
+          ) : null}
         </View>
       </Page>
     </Document>
-  );
-};
+  )
+}

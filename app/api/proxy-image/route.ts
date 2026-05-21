@@ -1,36 +1,18 @@
 import { NextResponse } from 'next/server';
 
-/**
- * Image Proxy Route - app/api/proxy-image/route.ts
- *
- * Endpoint ini berfungsi sebagai perantara (proxy) antara browser klien
- * dengan server gambar Hostinger. Dengan cara ini, browser tidak perlu
- * langsung mengakses domain Hostinger (yang berpotensi menyebabkan CORS),
- * melainkan cukup meminta gambar melalui domain Next.js yang sama.
- *
- * Penggunaan: /api/proxy-image?url=https://api.pendaftaran-perpus-batang.my.id/uploads/...
- */
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const imageUrl = searchParams.get('url');
-
-  if (!imageUrl) {
-    return NextResponse.json({ error: 'Parameter url diperlukan' }, { status: 400 });
-  }
-
-  // Validasi sederhana: hanya izinkan URL dari domain Hostinger kita
-  const allowedDomain = process.env.HOSTINGER_API_URL || 'api.pendaftaran-perpus-batang.my.id';
   try {
-    const parsed = new URL(imageUrl);
-    if (!parsed.hostname.endsWith(allowedDomain.replace(/^https?:\/\//, ''))) {
-      return NextResponse.json({ error: 'Domain tidak diizinkan' }, { status: 403 });
+    const { searchParams } = new URL(request.url);
+    const targetUrl = searchParams.get('url');
+
+    if (!targetUrl) {
+      return NextResponse.json({ error: 'Parameter URL diperlukan' }, { status: 400 });
     }
-  } catch {
-    return NextResponse.json({ error: 'URL tidak valid' }, { status: 400 });
-  }
 
-  try {
-    const res = await fetch(imageUrl, {
+    console.log('[proxy-image] Proxying request untuk:', targetUrl);
+
+    // Ambil data gambar dari Hostinger melalui server-to-server request
+    const response = await fetch(targetUrl, {
       method: 'GET',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -38,25 +20,29 @@ export async function GET(request: Request) {
       },
     });
 
-    if (!res.ok) {
-      console.error(`[proxy-image] Fetch failed. Status: ${res.status}, URL: ${imageUrl}`);
-      return NextResponse.json({ error: 'Gagal mengambil gambar dari server' }, { status: res.status });
+    if (!response.ok) {
+      console.error(`[proxy-image] Gagal fetch gambar dari sumber asli. Status: ${response.status}`);
+      return NextResponse.json({ error: 'Gagal mengambil gambar dari server Hostinger' }, { status: response.status });
     }
 
-    const contentType = res.headers.get('content-type') || 'image/jpeg';
-    const arrayBuffer = await res.arrayBuffer();
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const arrayBuffer = await response.arrayBuffer();
 
-    return new NextResponse(arrayBuffer, {
-      status: 200,
+    // PERBAIKAN DI SINI: Bungkus arrayBuffer ke Buffer agar Next.js mengirimkan binary data yang solid
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Kembalikan gambar asli langsung ke browser pendaftar
+    return new NextResponse(buffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400', // cache 24 jam di browser
-        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=43200',
+        'Access-Control-Allow-Origin': '*', // Izinkan browser membaca gambar ini secara lokal (Mengatasi CORS)
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
       },
     });
 
-  } catch (err: any) {
-    console.error('[proxy-image] Exception:', err?.message || err);
-    return NextResponse.json({ error: 'Terjadi kesalahan pada proxy gambar' }, { status: 500 });
+  } catch (error: any) {
+    console.error('[proxy-image] Error pada Proxy:', error?.message || error);
+    return NextResponse.json({ error: 'Internal Server Error pada sistem Proxy' }, { status: 500 });
   }
 }
