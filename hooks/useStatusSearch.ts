@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
 import QRCode from 'qrcode'
 import { Registration, RegistrationStatus } from '@/types'
 import { STATUS_CONFIG } from '@/lib/constants'
@@ -36,27 +35,31 @@ export function useStatusSearch(initialTicket: string = '') {
     if (!ticket) return
 
     setSearchState('loading')
-    const { data, error } = await supabase
-      .from('registrations')
-      .select('*')
-      .eq('ticket_no', ticket)
-      .single()
 
-    if (error || !data) {
+    try {
+      const res = await fetch(`/api/registrations?ticket_no=${encodeURIComponent(ticket)}`)
+      const json = await res.json()
+
+      if (!res.ok || json.error || !json.data) {
+        setSearchState('not_found')
+        setResult(null)
+      } else {
+        const r = json.data
+        setResult({
+          ticketNumber: r.ticket_no,
+          fullname: r.fullname,
+          status: r.status as RegistrationStatus,
+          createdAt: r.created_at,
+          approvedAt: r.approved_at,
+          rejectReason: r.reject_reason,
+          pasFotoUrl: r.pas_foto_url
+        })
+        setSearchState('found')
+      }
+    } catch (err) {
+      console.error('Search error:', err)
       setSearchState('not_found')
       setResult(null)
-    } else {
-      const r = data as any
-      setResult({
-        ticketNumber: r.ticket_no,
-        fullname: r.fullname,
-        status: r.status as RegistrationStatus,
-        createdAt: r.created_at,
-        approvedAt: r.approved_at,
-        rejectReason: r.reject_reason,
-        pasFotoUrl: r.pas_foto_url
-      })
-      setSearchState('found')
     }
   }, [ticketInput])
 

@@ -9,7 +9,7 @@ import { Clock, CheckCircle2, XCircle, Info, Download, Mail, RotateCcw, Loader2 
 interface StatusCardProps {
   result: Partial<Registration>
   qrCodeData: string
-  getImageUrl: (path: string, folder: 'pas-foto' | 'foto-ktp') => string | null
+  getImageUrl: (path: string) => string | null
   formatDate: (iso: string | null | undefined) => string
 }
 
@@ -121,7 +121,7 @@ export function StatusCard({ result, qrCodeData, getImageUrl, formatDate }: Stat
                         ticketNumber: result.ticketNumber || ''
                       }}
                       qrCodeUrl={qrCodeData}
-                      pasFotoPublicUrl={getImageUrl(result.pasFotoUrl || '', 'pas-foto') || ''}
+                      pasFotoPublicUrl={getImageUrl(result.pasFotoUrl || '') || ''}
                     />
                   }
                   fileName={`KARTU-PERPUS-${(result.fullname || 'UNKNOWN').toUpperCase().replace(/\s+/g, '-')}.pdf`}

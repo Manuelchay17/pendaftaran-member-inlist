@@ -1,47 +1,41 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { jwtVerify } from 'jose'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
+  const token = request.cookies.get('admin_token')?.value;
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          )
-        },
-      },
+  // Protect deeper /admin routes (if any)
+  if (request.nextUrl.pathname.startsWith('/admin') && request.nextUrl.pathname !== '/admin') {
+    if (!token) {
+      return NextResponse.redirect(new URL('/admin', request.url));
     }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Protect /admin routes
-  if (request.nextUrl.pathname.startsWith('/admin')) {
-    if (!user && !request.nextUrl.pathname.includes('/admin')) {
-      // If no user, let them stay on /admin (which shows login form)
-      // But prevent them from accessing deeper paths if any
+    try {
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'super_secret_jwt_key_dispuspa_batang_2026_xyz123');
+      await jwtVerify(token, secret);
+    } catch (err) {
+      const response = NextResponse.redirect(new URL('/admin', request.url));
+      response.cookies.delete('admin_token');
+      return response;
     }
   }
 
-  return response
+  // Protect admin API endpoints
+  const isAdminApi = request.nextUrl.pathname.startsWith('/api/admin') || 
+                     (request.nextUrl.pathname === '/api/registrations' && request.method === 'PATCH');
+
+  if (isAdminApi) {
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    try {
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'super_secret_jwt_key_dispuspa_batang_2026_xyz123');
+      await jwtVerify(token, secret);
+    } catch (err) {
+      return NextResponse.json({ error: 'Invalid Token' }, { status: 401 });
+    }
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

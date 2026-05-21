@@ -14,7 +14,7 @@ interface ActionModalsProps {
   onApprove: (reg: Registration) => void
   onReject: () => void
   qrCodeData: string
-  getImageUrl: (path: string, folder: 'pas-foto' | 'foto-ktp') => string | null
+  getImageUrl: (path: string) => string | null
   showRejectForm: boolean
   setShowRejectForm: (show: boolean) => void
   rejectReason: string
@@ -145,13 +145,13 @@ export function ActionModals({
                   {selectedReg.pasFotoUrl ? (
                     <>
                       <img
-                        src={getImageUrl(selectedReg.pasFotoUrl || '', 'pas-foto') || ''}
+                        src={getImageUrl(selectedReg.pasFotoUrl || '') || ''}
                         alt="Pas Foto"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                       {/* Overlay click to view */}
                       <a
-                        href={getImageUrl(selectedReg.pasFotoUrl || '', 'pas-foto') || '#'}
+                        href={getImageUrl(selectedReg.pasFotoUrl || '') || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100"
@@ -182,13 +182,13 @@ export function ActionModals({
                   {selectedReg.fotoKtpUrl ? (
                     <>
                       <img
-                        src={getImageUrl(selectedReg.fotoKtpUrl || '', 'foto-ktp') || ''}
+                        src={getImageUrl(selectedReg.fotoKtpUrl || '') || ''}
                         alt="Foto KTP"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                       {/* Overlay click to view */}
                       <a
-                        href={getImageUrl(selectedReg.fotoKtpUrl || '', 'foto-ktp') || '#'}
+                        href={getImageUrl(selectedReg.fotoKtpUrl || '') || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100"
@@ -284,7 +284,7 @@ export function ActionModals({
                         ticketNumber: selectedReg.ticketNumber
                       }}
                       qrCodeUrl={qrCodeData}
-                      pasFotoPublicUrl={getImageUrl(selectedReg.pasFotoUrl || '', 'pas-foto') || ''}
+                      pasFotoPublicUrl={getImageUrl(selectedReg.pasFotoUrl || '') || ''}
                     />
                   }
                   fileName={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}

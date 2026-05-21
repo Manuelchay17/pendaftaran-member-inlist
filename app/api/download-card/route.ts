@@ -1,15 +1,10 @@
 import React from 'react';
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import pool from '@/lib/db';
 import { renderToStream } from '@react-pdf/renderer';
 import { LibraryCardPDF } from '@/app/components/LibraryCardPDF';
 import QRCode from 'qrcode';
 import { STATUS_CONFIG } from '@/lib/constants';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export async function GET(request: Request) {
   try {
@@ -20,14 +15,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Parameter tiket diperlukan' }, { status: 400 });
     }
 
-    // Cari data pendaftaran berdasarkan nomor tiket via Supabase
-    const { data: registration, error } = await supabase
-      .from('registrations')
-      .select('*')
-      .eq('ticket_no', tiket)
-      .single();
+    // Cari data pendaftaran berdasarkan nomor tiket via MySQL
+    const [rows] = await pool.execute(
+      'SELECT * FROM registrations WHERE ticket_no = ?',
+      [tiket]
+    );
+    const registrations = rows as any[];
+    const registration = registrations[0];
 
-    if (error || !registration) {
+    if (!registration) {
       return NextResponse.json({ error: 'Data pendaftaran tidak ditemukan' }, { status: 404 });
     }
 
@@ -48,12 +44,14 @@ export async function GET(request: Request) {
       }
     });
 
-    // 2. Format URL gambar profil (Supabase Storage)
+    // 2. Format URL gambar profil (Lokal /uploads)
     let pasFotoPublicUrl = '';
-    if (registration.pas_foto_url && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    if (registration.pas_foto_url) {
       const cleanPath = registration.pas_foto_url.trim();
-      const finalPath = cleanPath.includes('/') ? cleanPath : `pas-foto/${cleanPath}`;
-      pasFotoPublicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${STATUS_CONFIG.STORAGE_BUCKET}/${finalPath}`;
+      const imagePath = cleanPath.startsWith('/uploads/') 
+        ? cleanPath 
+        : `/uploads/${cleanPath}`;
+      pasFotoPublicUrl = `${baseUrl}${imagePath}`;
     }
 
     // 3. Render PDF ke stream

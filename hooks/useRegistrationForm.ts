@@ -1,10 +1,9 @@
 import { useState, ChangeEvent, FormEvent } from 'react'
-import { supabase } from '@/lib/supabase'
-import { FormData, FormErrors } from '@/types'
+import type { FormData as RegFormData, FormErrors } from '@/types'
 import { FORM_CONFIG, COMMON_REGEX } from '@/lib/constants'
 
 export function useRegistrationForm() {
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<RegFormData>({
     fullname: "",
     placeOfBirth: "",
     dateOfBirth: "",
@@ -165,17 +164,21 @@ export function useRegistrationForm() {
     return true
   }
 
-  const uploadFile = async (file: File, folder: string, ticket: string) => {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${ticket}-${Date.now()}.${fileExt}`
-    const filePath = `${folder}/${fileName}`
+  // Upload file via /api/upload (MySQL/Hostinger filesystem)
+  const uploadFile = async (file: File, type: 'pas_foto' | 'foto_ktp', ticketNo: string): Promise<string> => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('type', type)
+    fd.append('ticket_no', ticketNo)
 
-    const { error } = await supabase.storage
-      .from(FORM_CONFIG.STORAGE_BUCKET)
-      .upload(filePath, file)
+    const res = await fetch('/api/upload', { method: 'POST', body: fd })
+    const json = await res.json()
 
-    if (error) throw error
-    return filePath
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || 'Gagal mengupload file')
+    }
+
+    return json.url
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -186,14 +189,17 @@ export function useRegistrationForm() {
     try {
       const ticket = `${FORM_CONFIG.TICKET_PREFIX}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
       
-      const [pasFotoPath, fotoKtpPath] = await Promise.all([
-        uploadFile(pasFoto!, 'pas-foto', ticket),
-        uploadFile(fotoKtp!, 'foto-ktp', ticket)
+      // Upload files via /api/upload
+      const [pasFotoUrl, fotoKtpUrl] = await Promise.all([
+        uploadFile(pasFoto!, 'pas_foto', ticket),
+        uploadFile(fotoKtp!, 'foto_ktp', ticket)
       ])
 
-      const { error } = await supabase
-        .from('registrations')
-        .insert([{
+      // Save registration via /api/registrations
+      const res = await fetch('/api/registrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           ticket_no: ticket,
           fullname: formData.fullname,
           identity_no: formData.identityNo,
@@ -211,8 +217,8 @@ export function useRegistrationForm() {
           sex_id: parseInt(formData.sexId),
           agama_id: parseInt(formData.agamaId),
           marital_status_id: formData.maritalStatusId,
-          pas_foto_url: pasFotoPath,
-          foto_ktp_url: fotoKtpPath,
+          pas_foto_url: pasFotoUrl,
+          foto_ktp_url: fotoKtpUrl,
           mother_maiden_name: formData.motherMaidenName,
           identity_type_id: parseInt(formData.identityTypeId),
           education_level_id: parseInt(formData.educationLevelId),
@@ -221,10 +227,14 @@ export function useRegistrationForm() {
           nama_darurat: formData.namaDarurat,
           telp_darurat: formData.telpDarurat,
           status_hubungan_darurat: formData.statusHubunganDarurat,
-          status: 'Menunggu'
-        }])
+          phone: formData.phone,
+        })
+      })
 
-      if (error) throw error
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Gagal menyimpan pendaftaran')
+      }
 
       setTicketNumber(ticket)
       setIsSuccess(true)

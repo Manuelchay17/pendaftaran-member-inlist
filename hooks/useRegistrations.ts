@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Registration, RegistrationStatus } from '@/types'
 import { ADMIN_CONFIG } from '@/lib/constants'
 
@@ -15,14 +14,13 @@ export function useRegistrations() {
   const fetchRegistrations = useCallback(async () => {
     try {
       setIsLoadingData(true)
-      const { data, error } = await supabase
-        .from(ADMIN_CONFIG.DB_TABLE)
-        .select('*')
-        .order('created_at', { ascending: false })
+      const res = await fetch('/api/registrations')
+      const json = await res.json()
 
-      if (error) throw error
+      if (!res.ok) throw new Error(json.error || 'Gagal memuat data')
 
-      const mapped = (data || []).map((r: any) => ({
+      const data = json.data || []
+      const mapped = data.map((r: any) => ({
         id: r.id,
         ticketNumber: r.ticket_no,
         fullname: r.fullname,
@@ -87,15 +85,18 @@ export function useRegistrations() {
       throw new Error('Email pendaftar tidak valid, tidak bisa mengirim notifikasi.')
     }
 
-    const { error } = await supabase
-      .from(ADMIN_CONFIG.DB_TABLE)
-      .update({ 
+    const res = await fetch('/api/registrations', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: reg.id,
         status: 'Disetujui',
-        approved_at: new Date().toISOString()
+        approved_by: 'admin.perpus'
       })
-      .eq('id', reg.id)
+    })
 
-    if (error) throw error
+    const json = await res.json()
+    if (!res.ok || !json.success) throw new Error(json.error || 'Gagal menyetujui')
 
     // Sync local state
     setRegistrations(prev => prev.map(item => 
@@ -117,15 +118,18 @@ export function useRegistrations() {
       throw new Error('Email pendaftar tidak valid, tidak bisa mengirim notifikasi.')
     }
 
-    const { error } = await supabase
-      .from(ADMIN_CONFIG.DB_TABLE)
-      .update({ 
+    const res = await fetch('/api/registrations', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: reg.id,
         status: 'Ditolak',
         reject_reason: reason
       })
-      .eq('id', reg.id)
+    })
 
-    if (error) throw error
+    const json = await res.json()
+    if (!res.ok || !json.success) throw new Error(json.error || 'Gagal menolak')
 
     // Sync local state
     setRegistrations(prev => prev.map(item => 

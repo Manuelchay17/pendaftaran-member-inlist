@@ -3,9 +3,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import QRCode from 'qrcode'
 import { 
   RefreshCw, LogOut, ShieldAlert, KeyRound, 
-  Loader2, Save, X, BookOpen, Eye, EyeOff 
+  Loader2, Save, X, BookOpen, Eye, EyeOff, Settings, LayoutDashboard, Users
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 
 import { Registration, RegistrationStatus } from '@/types'
 import { ADMIN_CONFIG } from '@/lib/constants'
@@ -14,6 +13,8 @@ import { useRegistrations } from '@/hooks/useRegistrations'
 import { StatsOverview } from '@/app/components/admin/StatsOverview'
 import { RegistrationTable } from '@/app/components/admin/RegistrationTable'
 import { ActionModals } from '@/app/components/admin/ActionModals'
+import { UserManagement } from './UserManagement'
+import { ProfileSettings } from './ProfileSettings'
 
 export default function AdminDashboard() {
   const { 
@@ -38,13 +39,11 @@ export default function AdminDashboard() {
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPass, setLoginPass] = useState('')
   const [loginError, setLoginError] = useState('')
+  const [userRole, setUserRole] = useState('')
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'pengguna' | 'profil'>('dashboard')
 
-  // Password Modal States
-  const [showPassModal, setShowPassModal] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
-  const [isUpdatingPass, setIsUpdatingPass] = useState(false)
+  // Password / Login UI States
   const [showLoginPass, setShowLoginPass] = useState(false)
-  const [showNewPass, setShowNewPass] = useState(false)
   
   const [activeFilter, setActiveFilter] = useState<'Semua'|RegistrationStatus>('Semua')
   const [searchQuery, setSearchQuery] = useState('')
@@ -54,22 +53,24 @@ export default function AdminDashboard() {
   // Check Session on Mount
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setIsLoggedIn(!!session)
-      setIsLoadingAuth(false)
-    }
-
-    checkSession()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(!!session)
-      if (!session) {
-        // Reset sensitive states on logout
-        setSearchQuery('')
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          setUserRole(data.user.role);
+          setActiveTab(data.user.role === 'superadmin' ? 'pengguna' : 'profil');
+          setIsLoggedIn(true);
+        } else {
+          setIsLoggedIn(false);
+          setSearchQuery('');
+        }
+      } catch (e) {
+        setIsLoggedIn(false);
+      } finally {
+        setIsLoadingAuth(false);
       }
-    })
-
-    return () => subscription.unsubscribe()
+    }
+    checkSession()
   }, [])
 
   useEffect(() => {
@@ -99,48 +100,37 @@ export default function AdminDashboard() {
     setLoginError('')
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password: loginPass,
-      })
-
-      if (error) throw error
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail, password: loginPass })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal login');
+      
+      setUserRole(data.user.role);
+      setActiveTab(data.user.role === 'superadmin' ? 'pengguna' : 'profil');
+      setIsLoggedIn(true);
+      setLoginEmail('');
+      setLoginPass('');
     } catch (err: any) {
-      setLoginError(err.message === 'Invalid login credentials' ? 'Email atau password salah!' : err.message)
+      setLoginError(err.message)
     } finally {
       setIsLoggingIn(false)
     }
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    setIsLoggedIn(false)
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setIsLoggedIn(false);
+    setSearchQuery('');
+    window.location.href = '/admin';
   }
 
   const showToast = useCallback((msg: string) => {
     setToast(msg)
     setTimeout(() => setToast(''), 3000)
   }, [setToast])
-
-  const handleUpdatePassword = async () => {
-    if (newPassword.length < 6) {
-      showToast('⚠️ Password minimal 6 karakter')
-      return
-    }
-
-    setIsUpdatingPass(true)
-    try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword })
-      if (error) throw error
-      showToast('✅ Password berhasil diperbarui!')
-      setShowPassModal(false)
-      setNewPassword('')
-    } catch (err: any) {
-      showToast('❌ Gagal: ' + err.message)
-    } finally {
-      setIsUpdatingPass(false)
-    }
-  }
 
   const onApprove = async (reg: Registration) => {
     try {
@@ -175,13 +165,11 @@ export default function AdminDashboard() {
     ditolak: registrations.filter(r=>r.status==='Ditolak').length 
   }), [registrations])
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
+  const getImageUrl = (path: string) => {
     if (!path) return null;
-    const cleanPath = path.trim();
-    const finalPath = cleanPath.includes('/') ? cleanPath : `${folder}/${cleanPath}`;
-    return `${supabaseUrl}/storage/v1/object/public/${ADMIN_CONFIG.STORAGE_BUCKET}/${finalPath}`;
+    const baseUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/uploads';
+    const cleanPath = path.startsWith('/uploads') ? path : `${baseUrl}/${path}`;
+    return cleanPath;
   };
 
   if (isLoadingAuth) {
@@ -274,14 +262,36 @@ export default function AdminDashboard() {
           </div>
           
           <div className="flex items-center gap-2 md:gap-3">
-            <button 
-              onClick={() => setShowPassModal(true)}
-              className="p-2.5 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all active:scale-95 text-blue-900 flex items-center gap-2 px-3 md:px-4"
-              title="Ganti Password"
-            >
-              <KeyRound size={16} />
-              <span className="text-xs font-bold md:block hidden">Sandi</span>
-            </button>
+            {activeTab !== 'dashboard' && (
+              <button 
+                onClick={() => setActiveTab('dashboard')}
+                className="p-2.5 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all active:scale-95 text-blue-900 flex items-center gap-2 px-3 md:px-4"
+                title="Kembali ke Dashboard"
+              >
+                <LayoutDashboard size={16} />
+                <span className="text-xs font-bold md:block hidden">Dashboard</span>
+              </button>
+            )}
+            {userRole === 'superadmin' && activeTab !== 'pengguna' && (
+              <button 
+                onClick={() => setActiveTab('pengguna')}
+                className="p-2.5 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all active:scale-95 text-blue-900 flex items-center gap-2 px-3 md:px-4"
+                title="Manajemen Pengguna"
+              >
+                <Users size={16} />
+                <span className="text-xs font-bold md:block hidden">Pengguna</span>
+              </button>
+            )}
+            {userRole === 'petugas' && activeTab !== 'profil' && (
+              <button 
+                onClick={() => setActiveTab('profil')}
+                className="p-2.5 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all active:scale-95 text-blue-900 flex items-center gap-2 px-3 md:px-4"
+                title="Pengaturan Profil"
+              >
+                <Settings size={16} />
+                <span className="text-xs font-bold md:block hidden">Profil</span>
+              </button>
+            )}
             <button 
               onClick={fetchRegistrations} 
               className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all active:scale-95 text-gray-500 flex items-center gap-2 px-3 md:px-4"
@@ -301,99 +311,64 @@ export default function AdminDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 mt-10">
-        {isLoadingData && !registrations.length && (
-          <div className="flex flex-col items-center justify-center py-32 opacity-20">
-            <RefreshCw className="animate-spin mb-4" size={48} strokeWidth={1} />
-            <p className="font-bold tracking-widest text-xs uppercase">Menyiapkan Data...</p>
-          </div>
+        {activeTab === 'pengguna' && userRole === 'superadmin' ? (
+          <UserManagement />
+        ) : activeTab === 'profil' && userRole === 'petugas' ? (
+          <ProfileSettings />
+        ) : (
+          <>
+            {isLoadingData && !registrations.length && (
+              <div className="flex flex-col items-center justify-center py-32 opacity-20">
+                <RefreshCw className="animate-spin mb-4" size={48} strokeWidth={1} />
+                <p className="font-bold tracking-widest text-xs uppercase">Menyiapkan Data...</p>
+              </div>
+            )}
+            
+            {fetchError && (
+              <div className="bg-rose-50 border border-rose-100 rounded-3xl p-5 mb-8 text-rose-600 text-sm flex items-center gap-4 animate-in fade-in slide-in-from-top-4">
+                <ShieldAlert size={24} />
+                <div className="flex-1">
+                  <p className="font-bold">Gagal Sinkronisasi</p>
+                  <p className="text-xs opacity-80">{fetchError}</p>
+                </div>
+                <button onClick={fetchRegistrations} className="bg-rose-600 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200">Coba Lagi</button>
+              </div>
+            )}
+
+            <StatsOverview counts={counts} />
+
+            <RegistrationTable 
+              registrations={filtered}
+              activeFilter={activeFilter}
+              setActiveFilter={setActiveFilter}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+              onSelect={(reg) => {
+                setSelectedReg(reg)
+                setShowRejectForm(false)
+              }}
+            />
+
+            <ActionModals 
+              selectedReg={selectedReg}
+              onClose={() => {
+                setSelectedReg(null)
+                setShowRejectForm(false)
+              }}
+              onApprove={onApprove}
+              onReject={onReject}
+              qrCodeData={qrCodeData}
+              getImageUrl={getImageUrl}
+              showRejectForm={showRejectForm}
+              setShowRejectForm={setShowRejectForm}
+              rejectReason={rejectReason}
+              setRejectReason={setRejectReason}
+            />
+          </>
         )}
-        
-        {fetchError && (
-          <div className="bg-rose-50 border border-rose-100 rounded-3xl p-5 mb-8 text-rose-600 text-sm flex items-center gap-4 animate-in fade-in slide-in-from-top-4">
-            <ShieldAlert size={24} />
-            <div className="flex-1">
-              <p className="font-bold">Gagal Sinkronisasi</p>
-              <p className="text-xs opacity-80">{fetchError}</p>
-            </div>
-            <button onClick={fetchRegistrations} className="bg-rose-600 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-rose-700 transition-colors shadow-lg shadow-rose-200">Coba Lagi</button>
-          </div>
-        )}
-
-        <StatsOverview counts={counts} />
-
-        <RegistrationTable 
-          registrations={filtered}
-          activeFilter={activeFilter}
-          setActiveFilter={setActiveFilter}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          onSelect={(reg) => {
-            setSelectedReg(reg)
-            setShowRejectForm(false)
-          }}
-        />
-
-        <ActionModals 
-          selectedReg={selectedReg}
-          onClose={() => {
-            setSelectedReg(null)
-            setShowRejectForm(false)
-          }}
-          onApprove={onApprove}
-          onReject={onReject}
-          qrCodeData={qrCodeData}
-          getImageUrl={getImageUrl}
-          showRejectForm={showRejectForm}
-          setShowRejectForm={setShowRejectForm}
-          rejectReason={rejectReason}
-          setRejectReason={setRejectReason}
-        />
       </main>
 
-      {/* Change Password Modal */}
-      {showPassModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-sm border border-gray-100" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-blue-900 flex items-center gap-2">
-                <KeyRound size={20} /> Ganti Password
-              </h2>
-              <button onClick={() => setShowPassModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Password Baru</label>
-                <div className="relative group/pass">
-                  <input 
-                    type={showNewPass ? "text" : "password"} 
-                    className="w-full bg-gray-50 border-2 border-transparent rounded-2xl px-5 py-3 pr-12 text-sm focus:bg-white focus:border-[#1e3a5f]/10 outline-none transition-all" 
-                    value={newPassword} 
-                    onChange={e => setNewPassword(e.target.value)} 
-                    placeholder="Min. 6 karakter"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPass(!showNewPass)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#1e3a5f] transition-colors"
-                  >
-                    {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-              <button 
-                onClick={handleUpdatePassword}
-                disabled={isUpdatingPass || newPassword.length < 6}
-                className="w-full py-3 bg-[#1e3a5f] text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-[#1e3a5f]/90 transition-all active:scale-95 disabled:bg-gray-300 disabled:active:scale-100"
-              >
-                {isUpdatingPass ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                SIMPAN PERUBAHAN
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Old Password Modal Removed */}
 
       {toast && (
         <Toast message={toast} />

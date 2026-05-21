@@ -4,7 +4,6 @@ import { useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useStatusSearch } from '@/hooks/useStatusSearch'
-import { STATUS_CONFIG } from '@/lib/constants'
 import { StatusCard } from '@/app/components/status/StatusCard'
 import { Search, ArrowLeft, XCircle, Loader2, BookOpen } from 'lucide-react'
 
@@ -34,13 +33,11 @@ function CekStatusInner() {
     }
   }, [result, generateQRCode])
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const getImageUrl = (path: string, folder: 'pas-foto' | 'foto-ktp') => {
+  const getImageUrl = (path: string) => {
     if (!path) return null;
-    const cleanPath = path.trim();
-    const finalPath = cleanPath.includes('/') ? cleanPath : `${folder}/${cleanPath}`;
-    return `${supabaseUrl}/storage/v1/object/public/${STATUS_CONFIG.STORAGE_BUCKET}/${finalPath}`;
+    const baseUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/uploads';
+    const cleanPath = path.startsWith('/uploads') ? path : `${baseUrl}/${path}`;
+    return cleanPath;
   };
 
   const formatDate = (iso: string | null | undefined) => {
