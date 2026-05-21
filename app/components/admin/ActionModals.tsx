@@ -35,6 +35,15 @@ export function ActionModals({
 }: ActionModalsProps) {
   if (!selectedReg) return null
 
+  // Helper untuk mendeteksi dan menangani URL absolut vs URL relatif dari database
+  const resolveImageUrl = (path: string | null | undefined): string => {
+    if (!path) return ''
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path
+    }
+    return getImageUrl(path) || ''
+  }
+
   return (
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-300"
@@ -145,13 +154,13 @@ export function ActionModals({
                   {selectedReg.pasFotoUrl ? (
                     <>
                       <img
-                        src={getImageUrl(selectedReg.pasFotoUrl || '') || ''}
+                        src={resolveImageUrl(selectedReg.pasFotoUrl)}
                         alt="Pas Foto"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                       {/* Overlay click to view */}
                       <a
-                        href={getImageUrl(selectedReg.pasFotoUrl || '') || '#'}
+                        href={resolveImageUrl(selectedReg.pasFotoUrl) || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100"
@@ -182,13 +191,13 @@ export function ActionModals({
                   {selectedReg.fotoKtpUrl ? (
                     <>
                       <img
-                        src={getImageUrl(selectedReg.fotoKtpUrl || '') || ''}
+                        src={resolveImageUrl(selectedReg.fotoKtpUrl)}
                         alt="Foto KTP"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                       {/* Overlay click to view */}
                       <a
-                        href={getImageUrl(selectedReg.fotoKtpUrl || '') || '#'}
+                        href={resolveImageUrl(selectedReg.fotoKtpUrl) || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="absolute inset-0 bg-black/0 group-hover:bg-black/40 flex items-center justify-center transition-all duration-300 opacity-0 group-hover:opacity-100"
@@ -284,7 +293,7 @@ export function ActionModals({
                         ticketNumber: selectedReg.ticketNumber
                       }}
                       qrCodeUrl={qrCodeData}
-                      pasFotoPublicUrl={getImageUrl(selectedReg.pasFotoUrl || '') || ''}
+                      pasFotoPublicUrl={resolveImageUrl(selectedReg.pasFotoUrl)}
                     />
                   }
                   fileName={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
