@@ -8,7 +8,7 @@ export interface EmailTemplateProps {
 export function getEmailTemplate({ type, fullname, ticketNumber, rejectReason }: EmailTemplateProps) {
   const brandBlue = '#1e3a5f';
   const brandGold = '#c8a84b';
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pendaftaran-perpus-batang.vercel.app';
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://pendaftaran-perpus-batang.my.id';
 
   let subject = '';
   let html = '';
