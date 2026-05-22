@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import pool from '@/lib/db'
 
-// GET — ambil semua registrations (untuk dashboard admin)
+// ============================================================
+// GET — Ambil Semua Registrations (Untuk Dashboard Admin / Cek Status)
+// ============================================================
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const ticketNo = searchParams.get('ticket_no')
 
     if (ticketNo) {
-      // Cari by ticket number (untuk cek status)
+      // Cari by ticket number (untuk cek status anggota)
       const [rows] = await pool.execute(
         `SELECT ticket_no, fullname, status, created_at, approved_at, reject_reason 
          FROM registrations WHERE ticket_no = ? LIMIT 1`,
@@ -33,7 +35,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST — simpan pendaftaran baru
+// ============================================================
+// POST — Simpan Pendaftaran Anggota Baru Online
+// ============================================================
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -79,13 +83,15 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH — update status (approve/reject) + Integrasi Real-time ke INLIS Lite
+// ============================================================
+// PATCH — Update Status (Approve/Reject) + Integrasi PHP Bridge
+// ============================================================
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json()
     const { id, status, reject_reason } = body
 
-    // Ambil identitas admin dari JWT cookie
+    // Ambil identitas admin dari JWT cookie untuk audit trail log
     const token = req.cookies.get('admin_token')?.value;
     let adminIdentity = 'admin.perpus';
 
@@ -119,18 +125,22 @@ export async function PATCH(req: NextRequest) {
       if (dataPendaftar) {
         // Alamat URL API Bridge lokal di komputer/server perpustakaan Batang
         const BRIDGE_URL = 'https://hungry-snakes-tickle.loca.lt/perpus-bridge/index.php?action=insert-member';
+
         try {
-          // 3. Kirim data pendaftar ke INLIS Lite via PHP Bridge
+          // 3. Kirim data pendaftar ke INLIS Lite via PHP Bridge (Ditambahkan bypass header LocalTunnel)
           const bridgeResponse = await fetch(BRIDGE_URL, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'X-API-Key': process.env.BRIDGE_API_KEY || 'dispuspa-batang-secret-2026',
+              'bypass-tunnel-reminder': 'true',      // ← Solusi Bypass Halaman Interstitial Loca.lt
+              'User-Agent': 'NextJS-PerpusBatang/1.0'  // ← Menyamar sebagai Client Aman terpercaya
             },
             body: JSON.stringify({
               Fullname: dataPendaftar.fullname,
               IdentityNo: dataPendaftar.identity_no,
               PlaceOfBirth: dataPendaftar.place_of_birth,
-              DateOfBirth: dataPendaftar.date_of_birth, // Format Y-m-d otomatis dihandle
+              DateOfBirth: dataPendaftar.date_of_birth,
               Address: dataPendaftar.address,
               Kecamatan: dataPendaftar.kecamatan,
               Kelurahan: dataPendaftar.kelurahan,
@@ -148,7 +158,15 @@ export async function PATCH(req: NextRequest) {
             }),
           });
 
-          const bridgeData = await bridgeResponse.json();
+          // Mengantisipasi jika teks balasan masih kotor / gagal diparse ke json
+          const textData = await bridgeResponse.text();
+          let bridgeData: any;
+
+          try {
+            bridgeData = JSON.parse(textData);
+          } catch (jsonErr) {
+            throw new Error(`Response PHP Bridge bukan JSON valid. Output: ${textData.substring(0, 100)}`);
+          }
 
           // 4. Jika PHP Bridge sukses memasukkan data ke INLIS Lite, ambil nomor anggota barunya
           if (bridgeResponse.ok && bridgeData.success) {
@@ -160,15 +178,16 @@ export async function PATCH(req: NextRequest) {
               [nextMemberNo, id]
             );
           } else {
-            console.error('PHP Bridge mengembalikan error:', bridgeData.error);
+            console.error('PHP Bridge mengembalikan error:', bridgeData.error || 'Unknown Error');
           }
         } catch (bridgeErr: any) {
           console.error('Gagal terhubung ke PHP Bridge (Pastikan XAMPP/Bridge menyala):', bridgeErr.message);
+          return NextResponse.json({ error: `PHP Bridge Error: ${bridgeErr.message}` }, { status: 502 });
         }
       }
 
     } else if (status === 'Ditolak') {
-      // Logika jika pendaftaran ditolak oleh petugas
+      // Logika jika pendaftaran ditolak oleh petugas admin
       await pool.execute(
         `UPDATE registrations SET status = 'Ditolak', reject_reason = ?, approved_by = ?, updated_at = NOW() WHERE id = ?`,
         [reject_reason, adminIdentity, id]
