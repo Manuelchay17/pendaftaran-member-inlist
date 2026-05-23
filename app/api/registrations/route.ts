@@ -124,8 +124,7 @@ export async function PATCH(req: NextRequest) {
 
       if (dataPendaftar) {
         // Alamat URL API Bridge lokal di komputer/server perpustakaan Batang
-        const BRIDGE_URL = 'https://bridge.pendaftaran-perpus-batang.my.id/perpus-bridge/index.php?action=insert-member';
-        try {
+        const BRIDGE_URL = 'https://bridge.pendaftaran-perpus-batang.my.id/perpus-bridge.php?action=insert-member'; try {
           // 3. Kirim data pendaftar ke INLIS Lite via PHP Bridge (Ditambahkan bypass header LocalTunnel)
           const bridgeResponse = await fetch(BRIDGE_URL, {
             method: 'POST',
