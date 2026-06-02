@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
 
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
     const fileName = `${type}_${ticketNo}_${Date.now()}.${ext}`;
+    
+    // Tentukan folder berdasarkan tipe upload (pas_foto atau foto_ktp)
     const folder = type === 'pas_foto' ? 'pas_foto' : 'foto_ktp';
 
     const phpFormData = new FormData();
@@ -20,7 +22,9 @@ export async function POST(req: NextRequest) {
     phpFormData.append('type', folder);
     phpFormData.append('filename', fileName);
 
-    // Kirim ke Hostinger
+    // ============================================================
+    // SEKARANG MENEMBAK KE ENDPOINT ONLINE (HOSTINGER)
+    // ============================================================
     const phpResponse = await fetch('https://api.pendaftaran-perpus-batang.my.id/upload.php', {
       method: 'POST',
       headers: {
@@ -32,12 +36,19 @@ export async function POST(req: NextRequest) {
     const data = await phpResponse.json();
 
     if (!phpResponse.ok) {
-      return NextResponse.json({ error: data.error || 'Gagal upload' }, { status: phpResponse.status });
+      return NextResponse.json({ error: data.error || 'Gagal upload ke Hostinger' }, { status: phpResponse.status });
     }
 
+    // ============================================================
+    // Kode manipulasi port lokal (localhost:8123) SUDAH DIHAPUS
+    // karena URL yang didapat langsung berupa URL publik Hostinger yang valid
+    // ============================================================
+
+    // Mengembalikan URL publik asli dari Hostinger agar bisa tampil di inlist
     return NextResponse.json({ success: true, url: data.url, fileName });
 
   } catch (err: any) {
+    console.error('Upload Error:', err.message);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

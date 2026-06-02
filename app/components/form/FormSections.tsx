@@ -68,12 +68,17 @@ export function PersonalDataSection({ formData, handleInputChange, errors }: For
 
         <div>
           <label htmlFor="maritalStatusId" className={labelClass}>Status Perkawinan <span className="text-rose-500 font-bold">*</span></label>
-          <select id="maritalStatusId" value={formData.maritalStatusId} onChange={handleInputChange} className={inputClass(errors.maritalStatusId)}>
-            <option value="">-- Pilih Status --</option>
-            <option value="Belum Menikah">Belum Menikah</option>
-            <option value="Menikah">Menikah</option>
-            <option value="Cerai">Cerai</option>
-          </select>
+         <select 
+  id="maritalStatusId" 
+  value={formData.maritalStatusId} 
+  onChange={handleInputChange} 
+  className={inputClass(errors.maritalStatusId)}
+>
+  <option value="">-- Pilih Status --</option>
+  <option value="1">Belum Menikah</option>
+  <option value="2">Menikah</option>
+  <option value="3">SMK</option>
+</select>
           {errors.maritalStatusId && <p className="text-rose-500 text-[10px] font-bold mt-1 ml-1 uppercase">{errors.maritalStatusId}</p>}
         </div>
 

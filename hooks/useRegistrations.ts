@@ -23,6 +23,7 @@ export function useRegistrations() {
       const mapped = data.map((r: any) => ({
         id: r.id,
         ticketNumber: r.ticket_no,
+        memberNo: r.member_no,
         fullname: r.fullname,
         identityNo: r.identity_no || '-',
         noHp: r.no_hp || '-',

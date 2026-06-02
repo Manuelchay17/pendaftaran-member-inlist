@@ -21,15 +21,17 @@ function CekStatusInner() {
 
   // Auto-search jika ada ?tiket= di URL
   useEffect(() => {
-    const tiketFromUrl = searchParams.get('tiket')
+    const tiketFromUrl = searchParams.get('tiket') || searchParams.get('member_no')
     if (tiketFromUrl) {
       handleSearch(tiketFromUrl)
     }
   }, [searchParams, handleSearch])
 
   useEffect(() => {
-    if (result && result.status === 'Disetujui' && result.ticketNumber) {
-      generateQRCode(result.ticketNumber)
+    if (result && result.status === 'Disetujui') {
+      // Utamakan member_no untuk QR Code jika sudah disetujuix1x`x 
+      const finalID = (result as any).memberNo || (result as any).member_no || result.ticketNumber;
+      if (finalID) generateQRCode(finalID);
     }
   }, [result, generateQRCode])
 

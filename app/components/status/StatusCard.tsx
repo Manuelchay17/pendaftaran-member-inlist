@@ -13,6 +13,7 @@ interface StatusCardProps {
 }
 
 export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) {
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
       {/* MENUNGGU */}
@@ -37,7 +38,7 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
                 <p className="font-bold text-[#1e3a5f]">{result.fullname}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Nomor Tiket</p>
+                <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Nomor Tiket Pendaftaran</p>
                 <p className="font-black text-[#1e3a5f] tracking-tighter">{result.ticketNumber}</p>
               </div>
               <div className="space-y-1 sm:col-span-2">
@@ -86,7 +87,7 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
                 <p className="font-bold text-[#1e3a5f]">{result.fullname}</p>
               </div>
               <div className="space-y-1">
-                <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Nomor Tiket</p>
+                <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Nomor Tiket Pendaftaran</p>
                 <p className="font-black text-[#1e3a5f] tracking-tighter">{result.ticketNumber}</p>
               </div>
               <div className="space-y-1">
@@ -118,6 +119,8 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
                   const proxiedFotoUrl = originalFotoUrl 
                     ? `/api/proxy-image?url=${encodeURIComponent(originalFotoUrl)}` 
                     : '';
+                  
+                  const memberNo = (result as any).memberNo || (result as any).member_no;
 
                   return (
                     <PDFDownloadLink
@@ -125,7 +128,7 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
                         <LibraryCardPDF
                           registration={{
                             fullname: result.fullname || '',
-                            ticketNumber: result.ticketNumber || '',
+                            ticketNumber: memberNo || result.ticketNumber || '',
                           }}
                           qrCodeUrl={qrCodeData}
                           pasFotoPublicUrl={proxiedFotoUrl}

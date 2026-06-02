@@ -35,13 +35,25 @@ export function ActionModals({
 }: ActionModalsProps) {
   if (!selectedReg) return null
 
-  // Helper untuk mendeteksi dan menangani URL absolut vs URL relatif dari database
+  // Helper untuk mengubah URL gambar asal ke URL Proxy Absolut Next.js
   const resolveImageUrl = (path: string | null | undefined): string => {
     if (!path) return ''
+    
+    // Tentukan URL dasar dari gambar asli
+    let originalUrl = ''
     if (path.startsWith('http://') || path.startsWith('https://')) {
-      return path
+      originalUrl = path
+    } else {
+      originalUrl = getImageUrl(path) || ''
     }
-    return getImageUrl(path) || ''
+
+    if (!originalUrl) return ''
+
+    // Dapatkan origin domain Next.js secara dinamis (fallback ke localhost:3000)
+    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+
+    // Bungkus ke API Proxy menggunakan URL Absolut agar aman di tag <img> maupun @react-pdf/renderer
+    return `${baseOrigin}/api/proxy-image?url=${encodeURIComponent(originalUrl)}`
   }
 
   return (
@@ -144,7 +156,7 @@ export function ActionModals({
             <section>
               <h3 className="text-[10px] font-bold text-blue-900/40 uppercase tracking-[0.2em] mb-4">Berkas Lampiran</h3>
               
-              {/* Pas Foto - Vertikal */}
+              {/* Pas Foto - Terbaca lewat Proxy */}
               <div className="mb-4">
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                   <User size={10} /> Pas Foto 
@@ -158,7 +170,6 @@ export function ActionModals({
                         alt="Pas Foto"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
-                      {/* Overlay click to view */}
                       <a
                         href={resolveImageUrl(selectedReg.pasFotoUrl) || '#'}
                         target="_blank"
@@ -181,7 +192,7 @@ export function ActionModals({
                 </div>
               </div>
 
-              {/* Foto KTP - Horizontal */}
+              {/* Foto KTP - Terbaca lewat Proxy */}
               <div>
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                   <CreditCard size={10} /> Foto KTP / Identitas
@@ -195,7 +206,6 @@ export function ActionModals({
                         alt="Foto KTP"
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
-                      {/* Overlay click to view */}
                       <a
                         href={resolveImageUrl(selectedReg.fotoKtpUrl) || '#'}
                         target="_blank"
@@ -285,45 +295,31 @@ export function ActionModals({
           {selectedReg.status === 'Disetujui' && (
             <div className="w-full">
               {qrCodeData ? (
-                (() => {
-                  // Ambil resolusi path foto asli dari database (apakah dia full url atau path relative /uploads)
-                  const originalFotoUrl = selectedReg.pasFotoUrl 
-                    ? (selectedReg.pasFotoUrl.startsWith('http') ? selectedReg.pasFotoUrl : resolveImageUrl(selectedReg.pasFotoUrl))
-                    : '';
-
-                  // Alirkan lewat Proxy Route lokal agar bebas CORS di browser admin
-                  const proxiedFotoUrl = originalFotoUrl 
-                    ? `/api/proxy-image?url=${encodeURIComponent(originalFotoUrl)}` 
-                    : '';
-
-                  return (
-                    <PDFDownloadLink
-                      document={
-                        <LibraryCardPDF
-                          registration={{
-                            fullname: selectedReg.fullname,
-                            ticketNumber: selectedReg.ticketNumber,
-                          }}
-                          qrCodeUrl={qrCodeData}
-                          pasFotoPublicUrl={proxiedFotoUrl}
-                        />
-                      }
-                      fileName={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
-                      className="w-full py-4 bg-gradient-to-r from-blue-900 to-indigo-900 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:opacity-95 transition-all duration-200 active:scale-95 shadow-xl shadow-blue-200"
-                    >
-                      {({ loading }) => loading ? (
-                        <>
-                          <Loader2 className="animate-spin" size={20} />
-                          MEMPROSES DATA KARTU...
-                        </>
-                      ) : (
-                        <>
-                          <Download size={20} /> UNDUH KARTU DIGITAL
-                        </>
-                      )}
-                    </PDFDownloadLink>
-                  );
-                })()
+                <PDFDownloadLink
+                  document={
+                    <LibraryCardPDF
+                      registration={{
+                        fullname: selectedReg.fullname,
+                        ticketNumber: selectedReg.ticketNumber,
+                      }}
+                      qrCodeUrl={qrCodeData}
+                      pasFotoPublicUrl={resolveImageUrl(selectedReg.pasFotoUrl)}
+                    />
+                  }
+                  fileName={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
+                  className="w-full py-4 bg-gradient-to-r from-blue-900 to-indigo-900 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:opacity-95 transition-all duration-200 active:scale-95 shadow-xl shadow-blue-200"
+                >
+                  {({ loading }) => loading ? (
+                    <>
+                      <Loader2 className="animate-spin" size={20} />
+                      MEMPROSES DATA KARTU...
+                    </>
+                  ) : (
+                    <>
+                      <Download size={20} /> UNDUH KARTU DIGITAL
+                    </>
+                  )}
+                </PDFDownloadLink>
               ) : (
                 <div className="w-full py-4 bg-gray-100 text-gray-400 font-bold rounded-2xl flex items-center justify-center gap-3">
                   <Loader2 className="animate-spin" size={20} />

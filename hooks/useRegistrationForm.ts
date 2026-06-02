@@ -94,6 +94,52 @@ export function useRegistrationForm() {
     })
   }
 
+  // Fungsi Autofill untuk mempermudah testing data tanpa input manual
+  const handleAutofill = () => {
+    const randomSuffix = Math.floor(100 + Math.random() * 900);
+    const mockIdentityNo = `332501${Date.now().toString().substring(3, 13)}`; // Generate NIK unik agar tidak duplikat
+
+    setFormData({
+      fullname: `Ahmad Wijaya Pratama ${randomSuffix}`,
+      placeOfBirth: "Batang",
+      dateOfBirth: "2001-08-17",
+      sexId: "1", // Laki-laki (biasanya ID 1 di INLIS Lite)
+      agamaId: "1", // Islam
+      maritalStatusId: "1", // Belum Kawin / Lajang
+      motherMaidenName: "Siti Aminah",
+      identityTypeId: "1", // KTP
+      identityNo: mockIdentityNo,
+      address: "Jl. Jenderal Sudirman No. 45",
+      kecamatan: "Batang",
+      kelurahan: "Kauman",
+      rt: "02",
+      rw: "05",
+      city: "Kabupaten Batang",
+      province: "Jawa Tengah",
+      noHp: "081234567890",
+      phone: "0285449123",
+      email: `ahmad.wijaya.${randomSuffix}@gmail.com`,
+      educationLevelId: "4", // Contoh S1 / Kuliah
+      jobId: "5", // Contoh ID untuk Pelajar/Mahasiswa agar memicu field instansi
+      institutionName: "Universitas Negeri Batang",
+      namaDarurat: "Budi Santoso",
+      telpDarurat: "089876543210",
+      statusHubunganDarurat: "Orang Tua",
+    });
+
+    // Mock file untuk melewati validasi upload berkas secara aman
+    const mockPasFoto = new File(["mock_pas_foto_content"], "dummy_pas_foto.jpg", { type: "image/jpeg" });
+    const mockFotoKtp = new File(["mock_foto_ktp_content"], "dummy_foto_ktp.jpg", { type: "image/jpeg" });
+
+    setPasFoto(mockPasFoto);
+    setFotoKtp(mockFotoKtp);
+    setPasFotoPreview("https://placehold.co/400x600/1e3a5f/ffffff.png?text=Pas+Foto+Tes");
+    setFotoKtpPreview("https://placehold.co/600x400/c8a84b/ffffff.png?text=Foto+KTP+Tes");
+
+    // Bersihkan semua log error yang sedang aktif
+    setErrors({});
+  };
+
   const validate = () => {
     const newErrors: FormErrors = {}
     
@@ -164,7 +210,6 @@ export function useRegistrationForm() {
     return true
   }
 
-  // Upload file via /api/upload (MySQL/Hostinger filesystem)
   const uploadFile = async (file: File, type: 'pas_foto' | 'foto_ktp', ticketNo: string): Promise<string> => {
     const fd = new FormData()
     fd.append('file', file)
@@ -189,13 +234,11 @@ export function useRegistrationForm() {
     try {
       const ticket = `${FORM_CONFIG.TICKET_PREFIX}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
       
-      // Upload files via /api/upload
       const [pasFotoUrl, fotoKtpUrl] = await Promise.all([
         uploadFile(pasFoto!, 'pas_foto', ticket),
         uploadFile(fotoKtp!, 'foto_ktp', ticket)
       ])
 
-      // Save registration via /api/registrations
       const res = await fetch('/api/registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -239,7 +282,6 @@ export function useRegistrationForm() {
       setTicketNumber(ticket)
       setIsSuccess(true)
 
-      // Background notification
       fetch('/api/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -271,6 +313,7 @@ export function useRegistrationForm() {
     handleInputChange,
     handleFileChange,
     handleCameraCapture,
-    handleSubmit
+    handleSubmit,
+    handleAutofill // <-- Diexport ke komponen luar
   }
 }

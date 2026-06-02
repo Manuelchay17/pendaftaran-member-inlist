@@ -47,6 +47,7 @@ export function useStatusSearch(initialTicket: string = '') {
         const r = json.data
         setResult({
           ticketNumber: r.ticket_no,
+          memberNo: r.member_no,
           fullname: r.fullname,
           status: r.status as RegistrationStatus,
           createdAt: r.created_at,

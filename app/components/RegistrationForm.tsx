@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { Loader2, Send } from 'lucide-react'
+import { Loader2, Send, Zap } from 'lucide-react'
 import { useRegistrationForm } from '@/hooks/useRegistrationForm'
 import { SuccessState } from './form/SuccessState'
 import { FileUploadSection } from './form/FileUploadSection'
@@ -25,16 +25,34 @@ export default function RegistrationForm() {
     handleInputChange,
     handleFileChange,
     handleCameraCapture,
-    handleSubmit
+    handleSubmit,
+    handleAutofill // <-- Destructure fungsi autofill dari hook
   } = useRegistrationForm()
 
   if (isSuccess) {
     return <SuccessState ticketNumber={ticketNumber} email={formData.email} />
   }
 
+  // Tombol shortcut testing hanya akan dirender pada mode localhost development (npm run dev)
+  const isDev = process.env.NODE_ENV === 'development';
+
   return (
     <div className="bg-white rounded-3xl shadow-2xl shadow-blue-900/5 border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="p-1 bg-gradient-to-r from-[#1e3a5f] via-[#c8a84b] to-[#1e3a5f]" />
+      
+      {/* Tombol Shortcut Autofill Data untuk mempercepat Testing */}
+      {isDev && (
+        <div className="px-6 sm:px-10 pt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={handleAutofill}
+            className="flex items-center gap-2 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-amber-500/20 transition-all duration-200 active:scale-95"
+          >
+            <Zap size={15} fill="white" className="animate-pulse" />
+            <span>⚡ AUTOFILL DATA TES</span>
+          </button>
+        </div>
+      )}
       
       <form onSubmit={handleSubmit} className="p-6 sm:p-10 space-y-10">
         <PersonalDataSection 

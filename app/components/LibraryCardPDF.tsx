@@ -1,7 +1,6 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 
-// Definisikan style dengan standar react-pdf
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
@@ -97,27 +96,20 @@ const styles = StyleSheet.create({
 interface LibraryCardPDFProps {
   registration: {
     fullname: string
-    ticketNumber: string
+    ticketNumber: string 
   }
   qrCodeUrl: string
   pasFotoPublicUrl: string
 }
 
 export function LibraryCardPDF({ registration, qrCodeUrl, pasFotoPublicUrl }: LibraryCardPDFProps) {
-  // Ambil URL saat runtime untuk memastikan host lokal terbaca dengan benar oleh react-pdf
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+  const finalFotoUrl = pasFotoPublicUrl || null
+  const finalQrUrl = qrCodeUrl || null
 
-  // Validasi URL Pas Foto: Jika menggunakan proxy relatif, tambahkan origin domainnya
-  let finalFotoUrl = pasFotoPublicUrl
-  if (finalFotoUrl && finalFotoUrl.startsWith('/')) {
-    finalFotoUrl = `${baseUrl}${finalFotoUrl}`
-  }
-
-  // Validasi URL QR Code
-  let finalQrUrl = qrCodeUrl
-  if (finalQrUrl && finalQrUrl.startsWith('/')) {
-    finalQrUrl = `${baseUrl}${finalQrUrl}`
-  }
+  // Deteksi: jika berawalan string "REG-", maka ini masih tiket sementara. Jika tidak, ini nomor resmi INLIS.
+  const isNomorAnggotaResmi = registration.ticketNumber && 
+                              !String(registration.ticketNumber).toUpperCase().startsWith('REG-') &&
+                              String(registration.ticketNumber).toLowerCase() !== 'null';
 
   return (
     <Document>
@@ -134,7 +126,7 @@ export function LibraryCardPDF({ registration, qrCodeUrl, pasFotoPublicUrl }: Li
               {finalFotoUrl ? (
                 <Image src={finalFotoUrl} style={styles.photo} />
               ) : (
-                <Text style={styles.noPhotoText}>NO FOTO</Text>
+                <View><Text style={styles.noPhotoText}>NO FOTO</Text></View>
               )}
             </View>
 
@@ -142,17 +134,21 @@ export function LibraryCardPDF({ registration, qrCodeUrl, pasFotoPublicUrl }: Li
             <View style={styles.infoContainer}>
               <View style={styles.fieldGroup}>
                 <Text style={styles.label}>Nama Lengkap</Text>
-                <Text style={styles.value}>{registration.fullname.toUpperCase()}</Text>
+                <Text style={styles.value}>
+                  {registration.fullname ? registration.fullname.toUpperCase() : ''}
+                </Text>
               </View>
 
               <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Nomor Tiket / Anggota</Text>
+                <Text style={styles.label}>
+                  {isNomorAnggotaResmi ? 'Nomor Anggota' : 'Nomor Tiket Pendaftaran'}
+                </Text>
                 <Text style={styles.ticketValue}>{registration.ticketNumber}</Text>
               </View>
             </View>
           </View>
 
-          {/* Bagian QR Code di Pojok Kanan Bawah */}
+          {/* Bagian QR Code */}
           {finalQrUrl ? (
             <View style={styles.qrContainer}>
               <Image src={finalQrUrl} style={styles.qrImage} />
