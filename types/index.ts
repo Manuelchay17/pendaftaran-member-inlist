@@ -3,6 +3,8 @@ export type RegistrationStatus = 'Menunggu' | 'Disetujui' | 'Ditolak';
 export interface Registration {
   id: number;
   ticketNumber: string;
+  memberNo?: string | null;     // 👈 TAMBAHKAN INI (Biar useStatusSearch tidak error)
+  endDate?: string | null;
   fullname: string;
   identityNo: string;
   noHp: string;
