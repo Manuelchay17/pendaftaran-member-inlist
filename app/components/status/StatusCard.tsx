@@ -125,14 +125,16 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
                   return (
                     <PDFDownloadLink
                       document={
-                        <LibraryCardPDF
-                          registration={{
-                            fullname: result.fullname || '',
-                            ticketNumber: memberNo || result.ticketNumber || '',
-                          }}
-                          qrCodeUrl={qrCodeData}
-                          pasFotoPublicUrl={proxiedFotoUrl}
-                        />
+                      <LibraryCardPDF
+  registration={{
+    fullname: result.fullname || '',
+    ticketNumber: String(memberNo || result.ticketNumber || ''),
+    // 🌟 TAMBAHKAN BARIS INI (sesuaikan dengan nama properti tanggal yang ada pada objek result Anda)
+    endDate: result.end_date || result.endDate || 'Sementara', 
+  }}
+  pasFotoPublicUrl={result.pas_foto_url || ''}
+  backgroundBase64={''} // Sesuaikan dengan variabel background jika ada
+/>
                       }
                       fileName={`KARTU-PERPUS-${(result.fullname || 'UNKNOWN').toUpperCase().replace(/\s+/g, '-')}.pdf`}
                       className="group relative w-full py-5 rounded-2xl bg-[#1e3a5f] hover:bg-blue-900 hover:shadow-blue-900/20 text-white font-black text-lg overflow-hidden transition-all duration-300 active:scale-95 shadow-xl flex items-center justify-center gap-3"

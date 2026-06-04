@@ -379,7 +379,7 @@ export function ActionModals({
                           }
                         })()
                       }}
-                      qrCodeUrl={qrCodeData}
+                     
                       pasFotoPublicUrl={resolveImageUrl(selectedReg.pas_foto_url || selectedReg.pasFotoUrl)} 
                       backgroundBase64={resolveBackgroundUrl(BG_CARD_URL)} 
                     />
