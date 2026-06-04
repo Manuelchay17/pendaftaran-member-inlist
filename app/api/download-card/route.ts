@@ -6,6 +6,9 @@ import { LibraryCardPDF } from '@/app/components/LibraryCardPDF';
 import QRCode from 'qrcode';
 import { STATUS_CONFIG } from '@/lib/constants';
 
+// URL Gambar latar belakang kartu di Hostinger Anda
+const BG_CARD_URL = "https://rosybrown-salmon-638703.hostingersite.com/images/BG-Kartu.jpeg";
+
 async function getBase64Image(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
@@ -26,9 +29,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const paramInput = searchParams.get('member_no') || searchParams.get('tiket') || searchParams.get('ticket_no');
 
-    // ============================================================
-    // DEBUG LOG 1: Cek Parameter Masuk dari Frontend
-    // ============================================================
     console.log("==================== DEBUG START ====================");
     console.log("[DEBUG 1] Parameter diterima dari Frontend:", paramInput);
     console.log("[DEBUG 1] Eksekusi terjadi pada runtime:", new Date().toLocaleString());
@@ -39,8 +39,6 @@ export async function GET(request: Request) {
     }
 
     let registration = null;
-
-    // Bersihkan input dari spasi liar dan paksa ke Uppercase untuk format tiket
     const cleanInput = paramInput.trim();
 
     if (cleanInput.toUpperCase().startsWith('REG-')) {
@@ -59,9 +57,6 @@ export async function GET(request: Request) {
       registration = rows[0];
     }
 
-    // ============================================================
-    // DEBUG LOG 2: Lihat Hasil Mentah yang Dibaca dari DB MySQL
-    // ============================================================
     console.log("[DEBUG 3] Data mentah hasil kueri Database MySQL:");
     console.log(JSON.stringify(registration, null, 2));
 
@@ -70,32 +65,32 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Data pendaftaran tidak ditemukan' }, { status: 404 });
     }
 
-    // ============================================================
-    // SELEKSI KETAT & AMAN: MEMBER_NO VS TICKET_NO
-    // ============================================================
     let nomorAnggotaResmi = '';
-
     if (
       registration.member_no !== null && 
       registration.member_no !== undefined && 
       String(registration.member_no).trim() !== '' && 
       String(registration.member_no).toLowerCase() !== 'null'
     ) {
-      // Jika lolos pengecekan di atas, berarti member_no dari INLIS benar-benar ada nilainya
       nomorAnggotaResmi = String(registration.member_no).trim();
       console.log("[DEBUG 4] Kondisi terpenuhi. Menggunakan member_no resmi:", nomorAnggotaResmi);
     } else {
-      // Jika kosong atau bertuliskan string 'NULL', kembalikan ke ticket_no
       nomorAnggotaResmi = String(registration.ticket_no).trim();
       console.log("[DEBUG 4] member_no kosong/null di DB. Fallback ke ticket_no:", nomorAnggotaResmi);
     }
 
     console.log("[DEBUG 5] NILAI AKHIR yang dilempar ke komponen PDF:", nomorAnggotaResmi);
-    console.log("===================== DEBUG END =====================");
 
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || STATUS_CONFIG.SITE_URL_FALLBACK;
     const urlVerifikasi = `${baseUrl}/cek-status?member_no=${nomorAnggotaResmi}`;
     const qrCodeData = await QRCode.toDataURL(urlVerifikasi, { margin: 1, width: 150 });
+
+    // --- PROSES KEDUA GAMBAR UTAMA MENJADI BASE64 DI SISI SERVER (Paling Aman untuk react-pdf) ---
+    console.log("[DEBUG 6] Mendownload background kartu & mengubah ke Base64...");
+    const backgroundBase64 = await getBase64Image(BG_CARD_URL);
+    if (!backgroundBase64) {
+      console.log("[DEBUG WARNING] Gagal mengunduh gambar background dari Hostinger!");
+    }
 
     let pasFotoPublicUrl = '';
     if (registration.pas_foto_url) {
@@ -103,7 +98,10 @@ export async function GET(request: Request) {
       pasFotoPublicUrl = cleanPath.startsWith('http') ? cleanPath : `${baseUrl}/uploads/${cleanPath.replace(/^\/?uploads\/?/, '')}`;
     }
     const pasFotoBase64 = pasFotoPublicUrl ? await getBase64Image(pasFotoPublicUrl) : null;
+    
+    console.log("===================== DEBUG END =====================");
 
+    // Render komponen PDF menjadi stream dengan data base64 yang solid
     const pdfStream = await renderToStream(
       React.createElement(LibraryCardPDF, {
         registration: {
@@ -111,11 +109,11 @@ export async function GET(request: Request) {
           ticketNumber: String(nomorAnggotaResmi)
         },
         qrCodeUrl: qrCodeData,
-        pasFotoPublicUrl: pasFotoBase64 || ''
+        pasFotoPublicUrl: pasFotoBase64 || '',
+        backgroundBase64: backgroundBase64 || '' // Mengirim data background base64
       }) as any
     );
 
-    // Paksa Next.js dan Browser untuk mem-bypass cache secara total (Anti-Cache Headers)
     return new NextResponse(pdfStream as any, {
       headers: {
         'Content-Type': 'application/pdf',
