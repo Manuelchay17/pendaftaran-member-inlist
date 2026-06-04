@@ -1,6 +1,9 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 
+// URL Gambar latar belakang dari Hostinger Anda sesuai lokasi di image_5c645c.png
+const BG_CARD_URL = "https://rosybrown-salmon-638703.hostingersite.com/images/BG-Kartu.jpeg"
+
 const styles = StyleSheet.create({
   page: {
     flexDirection: 'column',
@@ -10,39 +13,114 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   card: {
-    width: 400,
-    height: 250,
-    backgroundColor: '#1e3a5f',
-    borderRadius: 16,
-    padding: 16,
+    width: 450,         // Menyesuaikan rasio landscape template kartu baru
+    height: 285,        
     position: 'relative',
-    color: '#ffffff',
+    overflow: 'hidden',
+    borderRadius: 8,    // Sedikit lengkungan di pojok kartu
   },
-  header: {
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
+  contentContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    paddingTop: 85,    // Memberi ruang agar tidak menabrak header dinas di background
+    paddingHorizontal: 20,
+  },
+  // Box Kanan Atas untuk Status (Pelajar / Umum) & Nomor Anggota Atas
+  topRightBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 15,
+    alignItems: 'flex-end',
+  },
+  statusText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    fontFamily: 'Times-Bold', // Menggunakan font serif tegas mirip contoh
+    marginBottom: 16,
+  },
+  topTicketNumber: {
     fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 4,
-    letterSpacing: 1,
+    color: '#000000',
+    letterSpacing: 0.5,
   },
-  subHeader: {
-    fontSize: 8,
-    color: '#cbd5e1',
-    marginBottom: 15,
+  // Berlaku Hingga di bawah Nomor Anggota Kanan
+  expiryContainer: {
+    position: 'absolute',
+    top: 68,
+    right: 25,
+    alignItems: 'center',
   },
-  body: {
+  expiryLabel: {
+    fontSize: 11,
+    color: '#000000',
+    fontFamily: 'Times-Roman',
+  },
+  expiryValue: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Times-Roman',
+    marginTop: 2,
+  },
+  // Bagian Utama Tengah (Nama & Barcode/QR)
+  mainBody: {
     flexDirection: 'row',
-    gap: 15,
+    justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginTop: 10,
   },
-  photoContainer: {
-    width: 75,
-    height: 100,
-    backgroundColor: '#334155',
-    borderRadius: 6,
-    overflow: 'hidden',
+  leftSide: {
+    flexDirection: 'column',
+    width: '65%',
+    marginTop: 15,
+  },
+  fullname: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#000000',
+    fontFamily: 'Times-Bold', // Font serif sesuai contoh FAKHRIE
+    marginBottom: 15,
+    textTransform: 'uppercase',
+  },
+  // Container Barcode / QR Code Utama (Kiri Bawah)
+  barcodeContainer: {
+    backgroundColor: '#ffffff',
+    padding: 6,
+    width: 170,
+    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    border: '1px solid #475569',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  barcodePlaceholderText: {
+    fontSize: 7,
+    color: '#000000',
+    marginTop: 2,
+    fontWeight: 'bold',
+  },
+  // Pas Foto Kanan Bawah
+  photoContainer: {
+    width: 90,
+    height: 120,
+    backgroundColor: '#cbd5e1',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    overflow: 'hidden',
+    marginRight: 5,
+    marginTop: -5,
   },
   photo: {
     width: '100%',
@@ -51,45 +129,9 @@ const styles = StyleSheet.create({
   },
   noPhotoText: {
     fontSize: 8,
-    color: '#94a3b8',
-  },
-  infoContainer: {
-    flex: 1,
-    flexDirection: 'column',
-    gap: 8,
-  },
-  fieldGroup: {
-    marginBottom: 6,
-  },
-  label: {
-    fontSize: 7,
-    color: '#94a3b8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  value: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  ticketValue: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: '#38bdf8',
-  },
-  qrContainer: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 65,
-    height: 65,
-    backgroundColor: '#ffffff',
-    padding: 4,
-    borderRadius: 8,
-  },
-  qrImage: {
-    width: '100%',
-    height: '100%',
+    color: '#475569',
+    textAlign: 'center',
+    marginTop: 50,
   }
 })
 
@@ -106,54 +148,73 @@ export function LibraryCardPDF({ registration, qrCodeUrl, pasFotoPublicUrl }: Li
   const finalFotoUrl = pasFotoPublicUrl || null
   const finalQrUrl = qrCodeUrl || null
 
-  // Deteksi: jika berawalan string "REG-", maka ini masih tiket sementara. Jika tidak, ini nomor resmi INLIS.
+  // Deteksi nomor resmi atau tiket sementara
   const isNomorAnggotaResmi = registration.ticketNumber && 
                               !String(registration.ticketNumber).toUpperCase().startsWith('REG-') &&
                               String(registration.ticketNumber).toLowerCase() !== 'null';
+
+  // Hitung masa berlaku (Contoh: 3 tahun dari sekarang jika sudah resmi)
+  const getMasaBerlaku = () => {
+    if (!isNomorAnggotaResmi) return 'Sementara'
+    const date = new Array()
+    const d = new Date()
+    return `${d.getDate()}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear() + 3}`
+  }
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.card}>
-          {/* Header Kartu */}
-          <Text style={styles.header}>KARTU ANGGOTA PERPUSTAKAAN</Text>
-          <Text style={styles.subHeader}>Dinas Perpustakaan dan Kearsipan Kabupaten Batang</Text>
+          
+          {/* 1. LAYER BACKGROUND (Mengambil dari Hostinger) */}
+          <Image src={BG_CARD_URL} style={styles.backgroundImage} />
 
-          {/* Konten Utama */}
-          <View style={styles.body}>
-            {/* Bagian Pas Foto */}
-            <View style={styles.photoContainer}>
-              {finalFotoUrl ? (
-                <Image src={finalFotoUrl} style={styles.photo} />
-              ) : (
-                <View><Text style={styles.noPhotoText}>NO FOTO</Text></View>
-              )}
+          {/* 2. LAYER KONTEN DI ATAS BACKGROUND */}
+          <View style={styles.contentContainer}>
+            
+            {/* Bagian Kanan Atas: Status & Nomor Anggota */}
+            <View style={styles.topRightBadge}>
+              <Text style={styles.statusText}>Pelajar</Text>
+              <Text style={styles.topTicketNumber}>{registration.ticketNumber || '-'}</Text>
             </View>
 
-            {/* Bagian Data Teks */}
-            <View style={styles.infoContainer}>
-              <View style={styles.fieldGroup}>
-                <Text style={styles.label}>Nama Lengkap</Text>
-                <Text style={styles.value}>
-                  {registration.fullname ? registration.fullname.toUpperCase() : ''}
+            {/* Bagian Masa Berlaku Kartu */}
+            <View style={styles.expiryContainer}>
+              <Text style={styles.expiryLabel}>Berlaku Hingga</Text>
+              <Text style={styles.expiryValue}>{getMasaBerlaku()}</Text>
+            </View>
+
+            {/* Bagian Tengah: Nama, Barcode/QR, dan Pas Foto */}
+            <View style={styles.mainBody}>
+              
+              {/* Sisi Kiri (Nama Lengkap & Barcode/QR) */}
+              <View style={styles.leftSide}>
+                <Text style={styles.fullname}>
+                  {registration.fullname ? registration.fullname.toUpperCase() : 'NAMA ANGGOTA'}
                 </Text>
+                
+                {/* QR Code diposisikan di kotak putih barcode kiri bawah */}
+                <View style={styles.barcodeContainer}>
+                  {finalQrUrl ? (
+                    <Image src={finalQrUrl} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <Text style={styles.barcodePlaceholderText}>QR CODE / BARCODE</Text>
+                  )}
+                </View>
               </View>
 
-              <View style={styles.fieldGroup}>
-                <Text style={styles.label}>
-                  {isNomorAnggotaResmi ? 'Nomor Anggota' : 'Nomor Tiket Pendaftaran'}
-                </Text>
-                <Text style={styles.ticketValue}>{registration.ticketNumber}</Text>
+              {/* Sisi Kanan (Pas Foto) */}
+              <View style={styles.photoContainer}>
+                {finalFotoUrl ? (
+                  <Image src={finalFotoUrl} style={styles.photo} />
+                ) : (
+                  <Text style={styles.noPhotoText}>NO FOTO</Text>
+                )}
               </View>
+
             </View>
+
           </View>
-
-          {/* Bagian QR Code */}
-          {finalQrUrl ? (
-            <View style={styles.qrContainer}>
-              <Image src={finalQrUrl} style={styles.qrImage} />
-            </View>
-          ) : null}
         </View>
       </Page>
     </Document>
