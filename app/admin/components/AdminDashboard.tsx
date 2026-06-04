@@ -154,7 +154,7 @@ export default function AdminDashboard() {
   const filtered = useMemo(() => registrations.filter(r => {
     const query = searchQuery.toLowerCase()
     const matchFilter = activeFilter === 'Semua' || r.status === activeFilter
-    const matchSearch = r.fullname.toLowerCase().includes(query) || r.ticketNumber.toLowerCase().includes(query)
+    const matchSearch = r.fullname.toLowerCase().includes(query) 
     return matchFilter && matchSearch
   }), [registrations, activeFilter, searchQuery])
 
