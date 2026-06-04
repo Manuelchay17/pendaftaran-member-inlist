@@ -2,7 +2,6 @@ import React from 'react'
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer'
 
 const styles = StyleSheet.create({
-  // Mengubah height dari 285 ke 305 agar pas dengan aspek rasio 1040x706 piksel
   page: {
     backgroundColor: '#ffffff',
     width: 450,
@@ -26,7 +25,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: '100%',
-    paddingTop: 92,       // Menyesuaikan ruang kosong header karena kartu sedikit lebih tinggi
+    paddingTop: 92,       
     paddingHorizontal: 15,
     paddingBottom: 15,
     display: 'flex',
@@ -35,7 +34,7 @@ const styles = StyleSheet.create({
   },
   topRightBadge: {
     position: 'absolute',
-    top: 6,               // Diturunkan sedikit agar pas di tengah area hitam
+    top: 6,               
     right: 15,
     alignItems: 'center',
     width: 140,           
@@ -54,7 +53,7 @@ const styles = StyleSheet.create({
   },
   expiryContainer: {
     position: 'absolute',
-    top: 72,              // Menyesuaikan posisi teks "Berlaku Hingga" ke bawah nomor
+    top: 72,              
     right: 35,
     alignItems: 'center',
   },
@@ -80,7 +79,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     justifyContent: 'flex-end',
     width: '63%',
-    paddingBottom: 8,     // Memberikan sedikit ruang aman dari sisi bawah kartu
+    paddingBottom: 8,     
   },
   fullname: {
     fontSize: 15,
@@ -106,7 +105,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#ffffff',
     overflow: 'hidden',
-    marginBottom: 8,      // Menyeimbangkan jarak foto dengan sisi bawah kartu
+    marginBottom: 8,      
     marginRight: 5,
   },
   photo: {
@@ -129,13 +128,17 @@ interface LibraryCardPDFProps {
   }
   qrCodeUrl: string
   pasFotoPublicUrl: string
-  backgroundBase64: string 
+  backgroundBase64?: string // <--- Ditambahkan tanda tanya (?) agar menjadi opsional bagi ActionModals
 }
 
 export function LibraryCardPDF({ registration, qrCodeUrl, pasFotoPublicUrl, backgroundBase64 }: LibraryCardPDFProps) {
   const finalFotoUrl = pasFotoPublicUrl || null
   const finalQrUrl = qrCodeUrl || null
-  const finalBgUrl = backgroundBase64 || null
+  
+  // Jika backgroundBase64 tidak dikirim atau kosong "", gunakan URL langsung dari Hostinger sebagai cadangan (fallback)
+  const finalBgUrl = backgroundBase64 && backgroundBase64.trim() !== "" 
+    ? backgroundBase64 
+    : "https://rosybrown-salmon-638703.hostingersite.com/images/BG-Kartu.jpeg";
 
   const isNomorAnggotaResmi = registration.ticketNumber && 
                               !String(registration.ticketNumber).toUpperCase().startsWith('REG-') &&
@@ -149,10 +152,10 @@ export function LibraryCardPDF({ registration, qrCodeUrl, pasFotoPublicUrl, back
 
   return (
     <Document>
-      {/* Set ukuran halaman dinamis berbasis rasio gambar asli (450 x 305) */}
       <Page size={[450, 305]} style={styles.page}>
         <View style={styles.cardContainer}>
           
+          {/* Menampilkan gambar background baik berupa Base64 solid maupun URL Fallback */}
           {finalBgUrl && <Image src={finalBgUrl} style={styles.backgroundImage} />}
 
           <View style={styles.contentContainer}>

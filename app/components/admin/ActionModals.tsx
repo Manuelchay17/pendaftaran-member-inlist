@@ -304,6 +304,7 @@ export function ActionModals({
                       }}
                       qrCodeUrl={qrCodeData}
                       pasFotoPublicUrl={resolveImageUrl(selectedReg.pasFotoUrl)}
+                      backgroundBase64="" // Memasukkan string kosong agar aman melewati type-check TypeScript
                     />
                   }
                   fileName={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
