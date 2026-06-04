@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
     if (ticketNo) {
       const [rows] = await pool.execute(
-        `SELECT ticket_no, member_no, end_date, job_id, pas_foto_url, fullname, status, created_at, approved_at, reject_reason 
+        `SELECT ticket_no, member_no, end_date, end_date AS endDate, job_id, pas_foto_url, fullname, status, created_at, approved_at, reject_reason 
          FROM registrations WHERE ticket_no = ? LIMIT 1`,
         [ticketNo]
       )
@@ -22,8 +22,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: data[0] })
     }
 
+    // 🌟 FIXED: Mengembalikan kedua format `end_date` dan `end_date AS endDate` 
+    // agar kompatibel dengan state modal maupun komponen table di frontend tanpa merusak interface
     const [rows] = await pool.execute(
-      `SELECT id, ticket_no, member_no, end_date, fullname, place_of_birth, date_of_birth, address, kecamatan, kelurahan, 
+      `SELECT id, ticket_no, member_no, 
+              end_date, 
+              end_date AS endDate, 
+              fullname, place_of_birth, date_of_birth, address, kecamatan, kelurahan, 
               rt, rw, city, province, identity_type_id, identity_no, education_level_id, sex_id, 
               marital_status_id, job_id, institution_name, mother_maiden_name, email, no_hp, phone, 
               agama_id, nama_darurat, telp_darurat, status_hubungan_darurat, pas_foto_url, foto_ktp_url, 
@@ -252,23 +257,48 @@ export async function PATCH(req: NextRequest) {
         }
 
         memberNo = bridgeData.member_no;
-        endDate = bridgeData.end_date;
+        const rawEndDate = bridgeData.end_date;
+
+        // 🌟 FIXED LOGIC PARSING TANGGAL PHP BRIDGE:
+        // Konversi string mentah dari PHP Bridge agar sesuai dengan format DATE/DATETIME MySQL (YYYY-MM-DD)
+        let mysqlFormattedDate = null;
+        if (rawEndDate) {
+          const stringDate = String(rawEndDate).trim();
+          
+          // Deteksi jika formatnya DD-MM-YYYY (Contoh: 04-06-2027)
+          if (stringDate.includes('-') && stringDate.split('-')[0].length === 2) {
+            const [dd, mm, yyyy] = stringDate.split('-');
+            mysqlFormattedDate = `${yyyy}-${mm}-${dd}`;
+          } else {
+            // Fallback default JavaScript Date Object Parser
+            const d = new Date(stringDate);
+            if (!isNaN(d.getTime())) {
+              mysqlFormattedDate = d.toISOString().split('T')[0];
+            } else {
+              mysqlFormattedDate = stringDate; // Skenario terakhir jika format sudah YYYY-MM-DD murni
+            }
+          }
+        }
 
         const safeMemberNo = String(memberNo).trim();
-        const safeEndDate = String(endDate).trim();
+        const safeEndDate = mysqlFormattedDate; 
         const safeAdmin = String(adminIdentity).trim();
         const safeId = Number(id);
 
+        // 🌟 FIXED: Mengamankan query prepared statement
         const updateSuccessSql = `UPDATE registrations 
-                                  SET member_no = '${safeMemberNo}', 
-                                      end_date = '${safeEndDate}', 
+                                  SET member_no = ?, 
+                                      end_date = ?, 
                                       status = 'Disetujui', 
                                       approved_at = NOW(), 
                                       approved_by = ?, 
                                       updated_at = NOW() 
                                   WHERE id = ?`;
 
-        await pool.execute(updateSuccessSql, [safeAdmin, safeId]);
+        await pool.execute(updateSuccessSql, [safeMemberNo, safeEndDate, safeAdmin, safeId]);
+        
+        // Perbarui variable lokal untuk dilempar ke response return JSON
+        endDate = safeEndDate;
       }
 
     } else if (status === 'Ditolak') {
@@ -283,7 +313,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({
       success: true,
       member_no: memberNo,
-      end_date: endDate,
+      end_date: endDate, // Nilai sudah berformat YYYY-MM-DD bersih
       message: 'Proses pembaruan status registrasi berhasil disinkronisasi',
     });
 

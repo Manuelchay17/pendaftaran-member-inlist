@@ -24,6 +24,11 @@ export function useRegistrations() {
         id: r.id,
         ticketNumber: r.ticket_no,
         memberNo: r.member_no,
+        
+        // 🌟 FIXED 1: Mapping kolom end_date & endDate dari database ke model frontend
+        end_date: r.end_date || null,
+        endDate: r.endDate || r.end_date || null,
+
         fullname: r.fullname,
         identityNo: r.identity_no || '-',
         noHp: r.no_hp || '-',
@@ -99,10 +104,28 @@ export function useRegistrations() {
     const json = await res.json()
     if (!res.ok || !json.success) throw new Error(json.error || 'Gagal menyetujui')
 
-    // Sync local state
+    // 🌟 FIXED 2: Ambil member_no dan end_date asli hasil response dari API PATCH (PHP Bridge)
+    const updatedMemberNo = json.member_no || reg.memberNo;
+    const updatedEndDate = json.end_date || null;
+
+    // Sync local state registrations array agar row tabel langsung ter-update
     setRegistrations(prev => prev.map(item => 
-      item.id === reg.id ? { ...item, status: 'Disetujui', approvedAt: new Date().toISOString() } : item
+      item.id === reg.id 
+        ? { 
+            ...item, 
+            status: 'Disetujui', 
+            memberNo: updatedMemberNo,
+            end_date: updatedEndDate,
+            endDate: updatedEndDate,
+            approvedAt: new Date().toISOString() 
+          } 
+        : item
     ))
+
+    // 🌟 OPTIONAL TRICK: Jika modal kamu menutup otomatis setelah approve, setSelectedReg(null) sudah benar.
+    // Tetapi jika modal ingin tetap terbuka menampilkan tombol cetak kartu, ganti setSelectedReg(null) menjadi:
+    // setSelectedReg({ ...reg, status: 'Disetujui', memberNo: updatedMemberNo, end_date: updatedEndDate, endDate: updatedEndDate })
+    setSelectedReg(null)
 
     await sendNotification({
       type: 'STATUS_APPROVED',
@@ -110,8 +133,6 @@ export function useRegistrations() {
       fullname: reg.fullname,
       ticketNumber: reg.ticketNumber
     })
-
-    setSelectedReg(null)
   }
 
   const handleReject = async (reg: Registration, reason: string) => {
@@ -137,6 +158,10 @@ export function useRegistrations() {
       item.id === reg.id ? { ...item, status: 'Ditolak', rejectReason: reason } : item
     ))
 
+    setSelectedReg(null)
+    setShowRejectForm(false)
+    setRejectReason('')
+
     await sendNotification({
       type: 'STATUS_REJECTED',
       email: reg.email,
@@ -144,10 +169,6 @@ export function useRegistrations() {
       ticketNumber: reg.ticketNumber,
       rejectReason: reason
     })
-
-    setSelectedReg(null)
-    setShowRejectForm(false)
-    setRejectReason('')
   }
 
   return {

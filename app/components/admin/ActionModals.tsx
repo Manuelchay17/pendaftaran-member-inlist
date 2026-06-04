@@ -4,6 +4,10 @@ import {
   CheckCircle2, XCircle, Download, Loader2, 
   Info, Heart, ShieldAlert, CreditCard, Calendar, Eye
 } from 'lucide-react'
+
+// URL Gambar latar belakang merujuk ke folder public lokal untuk menghindari masalah CORS di client-side react-pdf
+const BG_CARD_URL = "/images/BG-Kartu.jpeg";
+
 import { Registration } from '@/types'
 import { PDFDownloadLink } from '@react-pdf/renderer'
 import { LibraryCardPDF } from '@/app/components/LibraryCardPDF'
@@ -39,6 +43,9 @@ export function ActionModals({
   const resolveImageUrl = (path: string | null | undefined): string => {
     if (!path) return ''
     
+    // Jika path sudah berupa base64 atau blob, langsung kembalikan
+    if (path.startsWith('data:') || path.startsWith('blob:')) return path
+
     // Tentukan URL dasar dari gambar asli
     let originalUrl = ''
     if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -54,6 +61,15 @@ export function ActionModals({
 
     // Bungkus ke API Proxy menggunakan URL Absolut agar aman di tag <img> maupun @react-pdf/renderer
     return `${baseOrigin}/api/proxy-image?url=${encodeURIComponent(originalUrl)}`
+  }
+
+  // Helper khusus untuk mendeteksi dan menyelesaikan path lokal dari folder public
+  const resolveBackgroundUrl = (url: string): string => {
+    if (url.startsWith('/')) {
+      const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+      return `${baseOrigin}${url}`
+    }
+    return resolveImageUrl(url)
   }
 
   return (
@@ -94,6 +110,20 @@ export function ActionModals({
                   <span className="text-gray-400 flex items-center gap-2"><User size={14} /> Nama</span>
                   <span className="font-semibold text-gray-800 text-right">{selectedReg.fullname}</span>
                 </div>
+                {/* 🔍 TEMPEL KODE DEBUG INI DI DALAM SEKSYEN DATA PRIBADI */}
+<div className="flex justify-between items-start group bg-yellow-50 p-2 rounded-lg border border-yellow-200">
+  <span className="text-amber-800 font-bold flex items-center gap-2">🔍 RAW SQL END_DATE:</span>
+  <span className="font-mono text-amber-950 font-bold text-right">
+    {selectedReg.end_date !== undefined ? JSON.stringify(selectedReg.end_date) : 'undefined (Kolom tidak di-select)'}
+  </span>
+</div>
+
+<div className="flex justify-between items-start group bg-blue-50 p-2 rounded-lg border border-blue-200 mt-1">
+  <span className="text-blue-800 font-bold flex items-center gap-2">🔍 RAW SQL ENDDATE:</span>
+  <span className="font-mono text-blue-950 font-bold text-right">
+    {selectedReg.endDate !== undefined ? JSON.stringify(selectedReg.endDate) : 'undefined (Kolom tidak di-select)'}
+  </span>
+</div>
                 <div className="flex justify-between items-start group">
                   <span className="text-gray-400 flex items-center gap-2"><CreditCard size={14} /> NIK</span>
                   <span className="font-mono text-gray-800">{selectedReg.identityNo}</span>
@@ -156,7 +186,7 @@ export function ActionModals({
             <section>
               <h3 className="text-[10px] font-bold text-blue-900/40 uppercase tracking-[0.2em] mb-4">Berkas Lampiran</h3>
               
-              {/* Pas Foto - Terbaca lewat Proxy */}
+              {/* Pas Foto */}
               <div className="mb-4">
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                   <User size={10} /> Pas Foto 
@@ -192,7 +222,7 @@ export function ActionModals({
                 </div>
               </div>
 
-              {/* Foto KTP - Terbaca lewat Proxy */}
+              {/* Foto KTP */}
               <div>
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                   <CreditCard size={10} /> Foto KTP / Identitas
@@ -300,11 +330,58 @@ export function ActionModals({
                     <LibraryCardPDF
                       registration={{
                         fullname: selectedReg.fullname,
-                        ticketNumber: selectedReg.ticketNumber,
+                        
+                        // Membaca nomor anggota resmi secara aman
+                        ticketNumber: (() => {
+                          const nomorAnggota = selectedReg.member_no || selectedReg.memberNo;
+                          if (nomorAnggota && String(nomorAnggota).toLowerCase() !== 'null' && String(nomorAnggota).trim() !== '') {
+                            return String(nomorAnggota);
+                          }
+                          return selectedReg.ticketNumber || selectedReg.ticket_no || '';
+                        })(),
+
+                        // 🌟 LOGIC SOLUSI TERBARU: Parsing string YYYY-MM-DD aman tanpa Object Date Browser
+                        endDate: (() => {
+                          const tanggalBerlaku = selectedReg.end_date || selectedReg.endDate;
+                          
+                          if (!tanggalBerlaku || String(tanggalBerlaku).toLowerCase() === 'null' || String(tanggalBerlaku).trim() === '') {
+                            return 'Sementara';
+                          }
+
+                          try {
+                            // Potong jika berupa ISO string penuh (Ambil bagian YYYY-MM-DD saja)
+                            const cleanDateStr = String(tanggalBerlaku).split('T')[0].trim();
+                            
+                            // Pecah berdasarkan tanda '-'
+                            const parts = cleanDateStr.split('-');
+                            if (parts.length === 3) {
+                              const [tahun, bulan, tanggal] = parts;
+                              
+                              // Jika urutannya YYYY-MM-DD, balik strukturnya menjadi format Indonesia
+                              if (tahun.length === 4) {
+                                return `${tanggal}-${bulan}-${tahun}`; 
+                              }
+                            }
+
+                            // Fallback jika ternyata urutannya terbalik dari data asal
+                            const d = new Date(cleanDateStr);
+                            if (!isNaN(d.getTime())) {
+                              const dd = String(d.getDate()).padStart(2, '0');
+                              const mm = String(d.getMonth() + 1).padStart(2, '0');
+                              const yyyy = d.getFullYear();
+                              return `${dd}-${mm}-${yyyy}`;
+                            }
+
+                            return cleanDateStr;
+                          } catch (error) {
+                            console.error("Gagal format tanggal di modal:", error);
+                            return 'Sementara';
+                          }
+                        })()
                       }}
                       qrCodeUrl={qrCodeData}
-                      pasFotoPublicUrl={resolveImageUrl(selectedReg.pasFotoUrl)}
-                      backgroundBase64="" // Memasukkan string kosong agar aman melewati type-check TypeScript
+                      pasFotoPublicUrl={resolveImageUrl(selectedReg.pas_foto_url || selectedReg.pasFotoUrl)} 
+                      backgroundBase64={resolveBackgroundUrl(BG_CARD_URL)} 
                     />
                   }
                   fileName={`KARTU-PERPUS-${selectedReg.fullname.toUpperCase().replace(/\s+/g, '-')}.pdf`}
@@ -342,4 +419,4 @@ export function ActionModals({
       </div>
     </div>
   )
-}
+} 
