@@ -1,14 +1,11 @@
 'use client'
 
 import { useEffect, Suspense } from 'react'
-import Link from 'next/navigation'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useStatusSearch } from '@/hooks/useStatusSearch'
 import { StatusCard } from '@/app/components/status/StatusCard'
 import { Search, ArrowLeft, XCircle, Loader2, BookOpen } from 'lucide-react'
-
-// URL Gambar latar belakang konstan merujuk ke folder public lokal
-const BG_CARD_URL = "/images/BG-Kartu.jpeg";
 
 function CekStatusInner() {
   const searchParams = useSearchParams()
@@ -22,7 +19,7 @@ function CekStatusInner() {
     generateQRCode
   } = useStatusSearch(searchParams.get('tiket')?.toUpperCase() || '')
 
-  // Auto-search jika ada ?tiket= atau ?member_no= di URL
+  // Auto-search jika ada ?tiket= di URL
   useEffect(() => {
     const tiketFromUrl = searchParams.get('tiket') || searchParams.get('member_no')
     if (tiketFromUrl) {
@@ -32,48 +29,10 @@ function CekStatusInner() {
 
   useEffect(() => {
     if (result && result.status === 'Disetujui') {
-      // Utamakan member_no untuk QR Code jika sudah disetujui
       const finalID = (result as any).memberNo || (result as any).member_no || result.ticketNumber;
       if (finalID) generateQRCode(finalID);
     }
   }, [result, generateQRCode])
-
-  // =========================================================================
-  // 🌟 HELPER URL PROXY ABSOLUT UNTUK MENGAMANKAN ASSET GAMBAR DARI CORS
-  // =========================================================================
-  const resolvePublicImageUrl = (path: string | null | undefined): string => {
-    if (!path) return ''
-    
-    // Jika path sudah berupa data base64 atau blob, langsung kembalikan
-    if (path.startsWith('data:') || path.startsWith('blob:')) return path
-
-    let originalUrl = ''
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      originalUrl = path
-    } else {
-      const baseUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/uploads'
-      originalUrl = path.startsWith('/uploads') ? path : `${baseUrl}/${path}`
-      
-      // Jika path masih relatif lokal, ubah menjadi URL absolut menggunakan domain window origin
-      if (originalUrl.startsWith('/')) {
-        const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
-        originalUrl = `${baseOrigin}${originalUrl}`
-      }
-    }
-
-    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
-    
-    // Bungkus ke API Proxy Server agar lolos dari validasi ketat @react-pdf/renderer
-    return `${baseOrigin}/api/proxy-image?url=${encodeURIComponent(originalUrl)}`
-  }
-
-  const resolvePublicBackgroundUrl = (url: string): string => {
-    if (url.startsWith('/')) {
-      const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
-      return `${baseOrigin}${url}`
-    }
-    return resolvePublicImageUrl(url)
-  }
 
   const formatDate = (iso: string | null | undefined) => {
     if (!iso) return '-'
@@ -86,9 +45,8 @@ function CekStatusInner() {
 
   return (
     <div className="min-h-screen bg-[#fcfcfd] font-sans">
-      {/* HEADER - Consistent with Landing Page */}
+      {/* HEADER */}
       <div className="relative overflow-hidden bg-[#1e3a5f] pt-12 pb-24 md:pt-16 md:pb-32 px-4">
-        {/* Abstract Background Shapes */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-10">
           <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] rounded-full bg-gradient-to-br from-white to-transparent blur-3xl" />
           <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] rounded-full bg-gradient-to-tl from-[#c8a84b] to-transparent blur-3xl" />
@@ -187,10 +145,7 @@ function CekStatusInner() {
           <StatusCard 
             result={result} 
             qrCodeData={qrCodeData} 
-            formatDate={formatDate}
-            // 🌟 WARISKAN PROXY RESOLVER KE STATUSCARD AGAR DIDUKUNG DI DOWNLOAD LINK UTAMA
-            pasFotoPublicUrl={resolvePublicImageUrl(result.pas_foto_url || result.pasFotoUrl)}
-            backgroundBase64={resolvePublicBackgroundUrl(BG_CARD_URL)}
+            formatDate={formatDate} 
           />
         )}
 

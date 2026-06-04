@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 import Link from 'next/link'
 import { ProgressSteps } from '@/app/components/ui/ProgressSteps'
@@ -12,7 +14,42 @@ interface StatusCardProps {
   formatDate: (iso: string | null | undefined) => string
 }
 
+// URL Background kartu bawaan dari folder public lokal
+const BG_CARD_URL = "/images/BG-Kartu.jpeg"
+
 export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) {
+
+  // =========================================================================
+  // 🌟 HELPER ABSOLUTE PROXY URL AGAR PAS FOTO DAN BACKGROUND LOLOS DARI CORS
+  // =========================================================================
+  const resolveAbsoluteProxyUrl = (path: string | null | undefined): string => {
+    if (!path) return ''
+    if (path.startsWith('data:') || path.startsWith('blob:')) return path
+
+    let originalUrl = ''
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      originalUrl = path
+    } {
+      const baseUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/uploads'
+      originalUrl = path.startsWith('/uploads') ? path : `${baseUrl}/${path}`
+      
+      if (originalUrl.startsWith('/')) {
+        const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+        originalUrl = `${baseOrigin}${originalUrl}`
+      }
+    }
+
+    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+    return `${baseOrigin}/api/proxy-image?url=${encodeURIComponent(originalUrl)}`
+  }
+
+  const resolveBackgroundUrl = (url: string): string => {
+    if (url.startsWith('/')) {
+      const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+      return `${baseOrigin}${url}`
+    }
+    return resolveAbsoluteProxyUrl(url)
+  }
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
@@ -111,30 +148,28 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
               </div>
             </div>
 
-            {/* AREA UTAMA DOWNLOAD KARTU DENGAN PROXY IMAGE */}
+            {/* AREA UTAMA DOWNLOAD KARTU */}
             <div className="pt-4">
               {qrCodeData ? (
                 (() => {
-                  const originalFotoUrl = result.pasFotoUrl || '';
-                  const proxiedFotoUrl = originalFotoUrl 
-                    ? `/api/proxy-image?url=${encodeURIComponent(originalFotoUrl)}` 
-                    : '';
-                  
+                  const originalFotoUrl = result.pasFotoUrl || result.pas_foto_url || '';
+                  const finalProxiedFoto = resolveAbsoluteProxyUrl(originalFotoUrl);
+                  const finalBackground = resolveBackgroundUrl(BG_CARD_URL);
                   const memberNo = (result as any).memberNo || (result as any).member_no;
 
                   return (
                     <PDFDownloadLink
                       document={
-                      <LibraryCardPDF
-  registration={{
-    fullname: result.fullname || '',
-    ticketNumber: String(memberNo || result.ticketNumber || ''),
-    // 🌟 TAMBAHKAN BARIS INI (sesuaikan dengan nama properti tanggal yang ada pada objek result Anda)
-    endDate: result.end_date || result.endDate || 'Sementara', 
-  }}
-  pasFotoPublicUrl={result.pas_foto_url || ''}
-  backgroundBase64={''} // Sesuaikan dengan variabel background jika ada
-/>
+                        <LibraryCardPDF
+                          registration={{
+                            fullname: result.fullname || '',
+                            ticketNumber: String(memberNo || result.ticketNumber || ''),
+                            endDate: result.end_date || result.endDate || 'Sementara', 
+                          }}
+                          // 🌟 BERHASIL DIPERBAIKI: Menggunakan URL ter-proxy secara aman
+                          pasFotoPublicUrl={finalProxiedFoto}
+                          backgroundBase64={finalBackground}
+                        />
                       }
                       fileName={`KARTU-PERPUS-${(result.fullname || 'UNKNOWN').toUpperCase().replace(/\s+/g, '-')}.pdf`}
                       className="group relative w-full py-5 rounded-2xl bg-[#1e3a5f] hover:bg-blue-900 hover:shadow-blue-900/20 text-white font-black text-lg overflow-hidden transition-all duration-300 active:scale-95 shadow-xl flex items-center justify-center gap-3"
