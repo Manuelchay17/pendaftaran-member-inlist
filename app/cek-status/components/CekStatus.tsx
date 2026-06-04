@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, Suspense } from 'react'
-import Link from 'next/link'
+import Link from 'next/navigation'
 import { useSearchParams } from 'next/navigation'
 import { useStatusSearch } from '@/hooks/useStatusSearch'
 import { StatusCard } from '@/app/components/status/StatusCard'
 import { Search, ArrowLeft, XCircle, Loader2, BookOpen } from 'lucide-react'
+
+// URL Gambar latar belakang konstan merujuk ke folder public lokal
+const BG_CARD_URL = "/images/BG-Kartu.jpeg";
 
 function CekStatusInner() {
   const searchParams = useSearchParams()
@@ -19,7 +22,7 @@ function CekStatusInner() {
     generateQRCode
   } = useStatusSearch(searchParams.get('tiket')?.toUpperCase() || '')
 
-  // Auto-search jika ada ?tiket= di URL
+  // Auto-search jika ada ?tiket= atau ?member_no= di URL
   useEffect(() => {
     const tiketFromUrl = searchParams.get('tiket') || searchParams.get('member_no')
     if (tiketFromUrl) {
@@ -29,18 +32,48 @@ function CekStatusInner() {
 
   useEffect(() => {
     if (result && result.status === 'Disetujui') {
-      // Utamakan member_no untuk QR Code jika sudah disetujuix1x`x 
+      // Utamakan member_no untuk QR Code jika sudah disetujui
       const finalID = (result as any).memberNo || (result as any).member_no || result.ticketNumber;
       if (finalID) generateQRCode(finalID);
     }
   }, [result, generateQRCode])
 
-  const getImageUrl = (path: string) => {
-    if (!path) return null;
-    const baseUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/uploads';
-    const cleanPath = path.startsWith('/uploads') ? path : `${baseUrl}/${path}`;
-    return cleanPath;
-  };
+  // =========================================================================
+  // 🌟 HELPER URL PROXY ABSOLUT UNTUK MENGAMANKAN ASSET GAMBAR DARI CORS
+  // =========================================================================
+  const resolvePublicImageUrl = (path: string | null | undefined): string => {
+    if (!path) return ''
+    
+    // Jika path sudah berupa data base64 atau blob, langsung kembalikan
+    if (path.startsWith('data:') || path.startsWith('blob:')) return path
+
+    let originalUrl = ''
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      originalUrl = path
+    } else {
+      const baseUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/uploads'
+      originalUrl = path.startsWith('/uploads') ? path : `${baseUrl}/${path}`
+      
+      // Jika path masih relatif lokal, ubah menjadi URL absolut menggunakan domain window origin
+      if (originalUrl.startsWith('/')) {
+        const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+        originalUrl = `${baseOrigin}${originalUrl}`
+      }
+    }
+
+    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+    
+    // Bungkus ke API Proxy Server agar lolos dari validasi ketat @react-pdf/renderer
+    return `${baseOrigin}/api/proxy-image?url=${encodeURIComponent(originalUrl)}`
+  }
+
+  const resolvePublicBackgroundUrl = (url: string): string => {
+    if (url.startsWith('/')) {
+      const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+      return `${baseOrigin}${url}`
+    }
+    return resolvePublicImageUrl(url)
+  }
 
   const formatDate = (iso: string | null | undefined) => {
     if (!iso) return '-'
@@ -129,7 +162,7 @@ function CekStatusInner() {
         {searchState === 'loading' && (
           <div className="bg-white/50 backdrop-blur-md rounded-[2.5rem] border border-gray-100 p-16 flex flex-col items-center justify-center gap-6 animate-pulse">
             <div className="relative">
-              <div className="w-16 h-16 border-4 border-blue-100 rounded-full" />
+              <div className="w-16 h-16 border-4 border-blue-50 rounded-full" />
               <div className="absolute inset-0 w-16 h-16 border-4 border-t-[#1e3a5f] rounded-full animate-spin" />
             </div>
             <p className="text-[#1e3a5f] font-black tracking-widest text-xs uppercase">Mencari data pendaftaran...</p>
@@ -154,7 +187,10 @@ function CekStatusInner() {
           <StatusCard 
             result={result} 
             qrCodeData={qrCodeData} 
-            formatDate={formatDate} 
+            formatDate={formatDate}
+            // 🌟 WARISKAN PROXY RESOLVER KE STATUSCARD AGAR DIDUKUNG DI DOWNLOAD LINK UTAMA
+            pasFotoPublicUrl={resolvePublicImageUrl(result.pas_foto_url || result.pasFotoUrl)}
+            backgroundBase64={resolvePublicBackgroundUrl(BG_CARD_URL)}
           />
         )}
 
