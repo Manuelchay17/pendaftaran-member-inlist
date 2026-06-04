@@ -154,6 +154,7 @@ export interface LibraryCardPDFProps {
   };
   pasFotoPublicUrl: string;
   backgroundBase64: string;
+  barcodeBase64?: string
 }
 
 export function LibraryCardPDF({ registration, pasFotoPublicUrl, backgroundBase64 }: LibraryCardPDFProps) {

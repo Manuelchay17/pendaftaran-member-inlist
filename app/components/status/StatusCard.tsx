@@ -29,7 +29,7 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
     let originalUrl = ''
     if (path.startsWith('http://') || path.startsWith('https://')) {
       originalUrl = path
-    } {
+    } else {
       const baseUrl = process.env.NEXT_PUBLIC_UPLOAD_URL || '/uploads'
       originalUrl = path.startsWith('/uploads') ? path : `${baseUrl}/${path}`
       
@@ -49,6 +49,12 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
       return `${baseOrigin}${url}`
     }
     return resolveAbsoluteProxyUrl(url)
+  }
+
+  // 🌟 HELPER GENERATOR BARCODE GAMBAR MURNI UNTUK CONSOLED PDF
+  const generateBarcodeImageUrl = (text: string): string => {
+    if (!text) return ''
+    return `https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(text)}&scale=3&rotate=N&includetext=true`
   }
 
   return (
@@ -133,7 +139,7 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
               </div>
               <div className="space-y-1">
                 <p className="text-[10px] font-extrabold text-gray-400 uppercase tracking-widest">Tanggal Disetujui</p>
-                <p className="font-bold text-emerald-600">{formatDate(result.approvedAt)}</p>
+                <p className="font-bold text-emerald-600">{formatDate(result.approvedAt || (result as any).approved_at)}</p>
               </div>
             </div>
 
@@ -152,10 +158,21 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
             <div className="pt-4">
               {qrCodeData ? (
                 (() => {
-                  const originalFotoUrl = result.pasFotoUrl || result.pas_foto_url || '';
+                  // 🌟 SOLUSI FOTO: Satukan pencarian CamelCase (Admin) & SnakeCase (Cek Status)
+                  const originalFotoUrl = result.pasFotoUrl || (result as any).pas_foto_url || '';
                   const finalProxiedFoto = resolveAbsoluteProxyUrl(originalFotoUrl);
                   const finalBackground = resolveBackgroundUrl(BG_CARD_URL);
-                  const memberNo = (result as any).memberNo || (result as any).member_no;
+                  
+                  // 🌟 SOLUSI NOMOR ANGGOTA
+                  const memberNo = (result as any).memberNo || (result as any).member_no || result.ticketNumber || '';
+                  
+                  // 🌟 SOLUSI TANGGAL: Ambil end_date jika endDate bernilai kosong dari API
+                  const rawEndDate = result.endDate || (result as any).end_date;
+                  const formattedEndDateText = rawEndDate ? formatDate(rawEndDate) : 'Sementara';
+
+                  // 🌟 SOLUSI BARCODE: Ubah teks barcode menjadi URL gambar murni ter-proxy
+                  const rawBarcodeUrl = generateBarcodeImageUrl(String(memberNo));
+                  const finalProxiedBarcode = resolveAbsoluteProxyUrl(rawBarcodeUrl);
 
                   return (
                     <PDFDownloadLink
@@ -163,24 +180,26 @@ export function StatusCard({ result, qrCodeData, formatDate }: StatusCardProps) 
                         <LibraryCardPDF
                           registration={{
                             fullname: result.fullname || '',
-                            ticketNumber: String(memberNo || result.ticketNumber || ''),
-                            endDate: result.end_date || result.endDate || 'Sementara', 
+                            ticketNumber: String(memberNo),
+                            endDate: formattedEndDateText, 
                           }}
-                          // 🌟 BERHASIL DIPERBAIKI: Menggunakan URL ter-proxy secara aman
                           pasFotoPublicUrl={finalProxiedFoto}
                           backgroundBase64={finalBackground}
+                          barcodeBase64={finalProxiedBarcode} // Oper gambar barcode murni
                         />
                       }
                       fileName={`KARTU-PERPUS-${(result.fullname || 'UNKNOWN').toUpperCase().replace(/\s+/g, '-')}.pdf`}
                       className="group relative w-full py-5 rounded-2xl bg-[#1e3a5f] hover:bg-blue-900 hover:shadow-blue-900/20 text-white font-black text-lg overflow-hidden transition-all duration-300 active:scale-95 shadow-xl flex items-center justify-center gap-3"
                     >
-                      {({ loading }) => (
+                      {({ loading, error }) => (
                         <>
                           {loading ? (
                             <>
                               <Loader2 className="animate-spin" size={24} />
                               <span>MERAKIT KARTU PDF...</span>
                             </>
+                          ) : error ? (
+                            <span>GAGAL MEMPROSES KARTU (CORS/FOTO ERROR)</span>
                           ) : (
                             <>
                               <Download size={24} className="group-hover:translate-y-1 transition-transform" />
